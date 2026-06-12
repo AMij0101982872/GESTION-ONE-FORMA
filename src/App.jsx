@@ -47,6 +47,15 @@ export default function App() {
     payments:    <Payments payments={store.payments} accounts={store.accounts} translators={store.translators} onAdd={store.addPayment} onMarkPaid={store.markPaid} onDelete={store.deletePayment} rate={store.rate} deduction={store.deduction} onSetRate={store.setRate} onSetDeduction={store.setDeduction} />,
   };
 
+  if (store.loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', flexDirection: 'column', gap: 12 }}>
+      <div style={{ width: 36, height: 36, background: '#111827', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>B</span>
+      </div>
+      <p style={{ color: 'var(--text2)', fontSize: 13, fontWeight: 600 }}>Connexion à la base de données…</p>
+    </div>
+  );
+
   const pendingAccounts = store.accounts.filter(a => a.status === 'pending').length;
   const pendingPayments = store.payments.filter(p => !p.paid).length;
   const badges = { accounts: pendingAccounts || null, payments: pendingPayments || null };
@@ -97,7 +106,7 @@ export default function App() {
         </nav>
 
         <div className="sidebar-bottom">
-          <p>Données stockées localement</p>
+          <p>Supabase · Cloud</p>
         </div>
       </aside>
 
