@@ -316,14 +316,14 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
           </div>
         )}
       </div>
-    </div>
 
-    {confirmId && (
-      <ConfirmModal
-        message="Supprimer ce compte définitivement ?"
-        onConfirm={() => { onDelete(confirmId); toast('Compte supprimé'); setConfirmId(null); }}
-        onCancel={() => setConfirmId(null)}
-      />
-    )}
+      {confirmId && (
+        <ConfirmModal
+          message="Supprimer ce compte définitivement ?"
+          onConfirm={() => { onDelete(confirmId); toast('Compte supprimé'); setConfirmId(null); }}
+          onCancel={() => setConfirmId(null)}
+        />
+      )}
+    </div>
   );
 }
