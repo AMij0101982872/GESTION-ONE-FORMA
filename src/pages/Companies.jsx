@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Building2, Plus, Pencil, Trash2, Eye, EyeOff, X, Check, Users, ChevronDown, ChevronRight, Phone, UserCircle } from 'lucide-react';
 import { toast } from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 const empty = { name: '', password: '' };
 
@@ -150,7 +151,8 @@ export default function Companies({ companies, accounts, translators = [], onAdd
   const [showPass, setShowPass] = useState({});
   const [showFormPass, setShowFormPass] = useState(false);
   const [expanded, setExpanded] = useState({});
-  const [selected, setSelected] = useState(null); // société cliquée
+  const [selected, setSelected]   = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
   const toggleExpand = (id) => setExpanded(s => ({ ...s, [id]: !s[id] }));
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -316,12 +318,7 @@ export default function Companies({ companies, accounts, translators = [], onAdd
                   </div>
                   <div style={{ display: 'flex', gap: 5 }} onClick={e => e.stopPropagation()}>
                     <button className="btn sm icon" onClick={() => startEdit(c)}><Pencil size={12} /></button>
-                    <button className="btn sm danger icon" onClick={() => {
-                      if (confirm(`Supprimer "${c.name}" ? Les comptes associés ne seront pas supprimés.`)) {
-                        onDelete(c.id);
-                        toast('Société supprimée');
-                      }
-                    }}><Trash2 size={12} /></button>
+                    <button className="btn sm danger icon" onClick={() => setConfirmId(c.id)}><Trash2 size={12} /></button>
                   </div>
                 </div>
 
@@ -406,6 +403,14 @@ export default function Companies({ companies, accounts, translators = [], onAdd
           accounts={accounts}
           translators={translators}
           onClose={() => setSelected(null)}
+        />
+      )}
+
+      {confirmId && (
+        <ConfirmModal
+          message={`Supprimer cette société ? Les comptes associés ne seront pas supprimés.`}
+          onConfirm={() => { onDelete(confirmId); toast('Société supprimée'); setConfirmId(null); }}
+          onCancel={() => setConfirmId(null)}
         />
       )}
     </div>

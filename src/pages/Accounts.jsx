@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Trash2, Search, LayoutGrid, AlertCircle, UserCheck, Activity, Building2 } from 'lucide-react';
 import { toast } from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 const STATUS_TABS = [
   { key: 'all',      label: 'Tous',        color: null },
@@ -17,6 +18,7 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
   const [filter, setFilter]       = useState('all');
   const [company, setCompany]     = useState('all');
   const [search, setSearch]       = useState('');
+  const [confirmId, setConfirmId] = useState(null);
 
   const setUn = (id, val) => setUsernames(u => ({ ...u, [id]: val }));
 
@@ -289,7 +291,7 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
                       {/* Actions */}
                       <td>
                         <button className="btn sm danger icon" title="Supprimer" onClick={() => {
-                          if (confirm('Supprimer ce compte ?')) { onDelete(acc.id); toast('Compte supprimé'); }
+                          setConfirmId(acc.id)
                         }}>
                           <Trash2 size={12} />
                         </button>
@@ -315,5 +317,13 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
         )}
       </div>
     </div>
+
+    {confirmId && (
+      <ConfirmModal
+        message="Supprimer ce compte définitivement ?"
+        onConfirm={() => { onDelete(confirmId); toast('Compte supprimé'); setConfirmId(null); }}
+        onCancel={() => setConfirmId(null)}
+      />
+    )}
   );
 }

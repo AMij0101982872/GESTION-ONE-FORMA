@@ -3,6 +3,7 @@ import { Check, Trash2, Upload, AlertCircle, ChevronDown, ChevronRight, Receipt 
 import * as XLSX from 'xlsx';
 import { toast } from '../components/Toast';
 import ReceiptModal from '../components/ReceiptModal';
+import ConfirmModal from '../components/ConfirmModal';
 
 const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 const periodLabel = (ym) => { const [y, m] = ym.split('-'); return `${MONTHS_FR[parseInt(m) - 1]} ${y}`; };
@@ -53,7 +54,8 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
   const [rateInput, setRateInput]           = useState(String(rate));
   const [deductionInput, setDeductionInput] = useState(String(deduction));
   const [openPeriods, setOpenPeriods] = useState({});
-  const [receipt, setReceipt]     = useState(null); // { translator, rows, period }
+  const [receipt, setReceipt]     = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
   const fileRef = useRef();
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -434,7 +436,7 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
                                     </button>
                                   )}
                                   <button className="btn sm danger icon" onClick={() => {
-                                    if (confirm('Supprimer cette ligne ?')) { onDelete(p.id); toast('Supprimé'); }
+                                    setConfirmId(p.id)
                                   }}>
                                     <Trash2 size={11} />
                                   </button>
@@ -462,6 +464,14 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
           deduction={deduction}
           accounts={accounts}
           onClose={() => setReceipt(null)}
+        />
+      )}
+
+      {confirmId && (
+        <ConfirmModal
+          message="Supprimer cette ligne de paiement ?"
+          onConfirm={() => { onDelete(confirmId); toast('Supprimé'); setConfirmId(null); }}
+          onCancel={() => setConfirmId(null)}
         />
       )}
     </div>

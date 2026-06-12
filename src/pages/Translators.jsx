@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { UserPlus, Pencil, Trash2, X, Users, Search, ChevronDown, ChevronRight, Activity } from 'lucide-react';
 import { toast } from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 const empty = { name: '', contact: '' };
 
@@ -35,6 +36,7 @@ export default function Translators({ translators, accounts, payments, onAdd, on
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch]   = useState('');
   const [expanded, setExpanded] = useState({});
+  const [confirmId, setConfirmId] = useState(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const toggleExpand = (id) => setExpanded(s => ({ ...s, [id]: !s[id] }));
@@ -190,9 +192,7 @@ export default function Translators({ translators, accounts, payments, onAdd, on
                 </div>
                 <div style={{ display: 'flex', gap: 5 }}>
                   <button className="btn sm icon" onClick={() => startEdit(t)}><Pencil size={12} /></button>
-                  <button className="btn sm danger icon" onClick={() => {
-                    if (confirm('Supprimer ce traducteur ? Ses comptes seront désassignés.')) { onDelete(t.id); toast('Traducteur supprimé'); }
-                  }}><Trash2 size={12} /></button>
+                  <button className="btn sm danger icon" onClick={() => setConfirmId(t.id)}><Trash2 size={12} /></button>
                 </div>
               </div>
 
@@ -295,6 +295,14 @@ export default function Translators({ translators, accounts, payments, onAdd, on
           <p style={{ color: 'var(--text2)', fontSize: 13 }}>Aucun résultat pour "<strong>{search}</strong>"</p>
           <button className="btn sm" style={{ marginTop: 10 }} onClick={() => setSearch('')}>Effacer la recherche</button>
         </div>
+      )}
+
+      {confirmId && (
+        <ConfirmModal
+          message="Supprimer ce traducteur ? Ses comptes seront désassignés."
+          onConfirm={() => { onDelete(confirmId); toast('Traducteur supprimé'); setConfirmId(null); }}
+          onCancel={() => setConfirmId(null)}
+        />
       )}
     </div>
   );
