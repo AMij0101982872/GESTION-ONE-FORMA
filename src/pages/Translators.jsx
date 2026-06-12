@@ -45,7 +45,7 @@ export default function Translators({ translators, accounts, payments, onAdd, on
       onUpdate(editId, { name: form.name.trim(), contact: form.contact.trim() });
       toast('Modifié ✓');
     } else {
-      onAdd({ name: form.name.trim(), contact: form.contact.trim(), langs: [] });
+      onAdd({ name: form.name.trim(), contact: form.contact.trim() });
       toast('Traducteur ajouté ✓');
     }
     setForm(empty); setEditId(null); setShowForm(false);
