@@ -8,9 +8,13 @@ function parseUsernamePaste(text) {
   return lines.reduce((acc, line) => {
     const emailMatch = line.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
     if (!emailMatch) return acc;
-    const email    = emailMatch[0];
-    const username = line.replace(email, '').replace(/^[\s:|\-]+|[\s:|\-]+$/g, '').trim();
-    if (username) acc.push({ email, username });
+    const email = emailMatch[0];
+    // Remaining parts after removing email, split by common separators
+    const rest  = line.replace(email, '').split(/[\s:|\-]+/).map(s => s.trim()).filter(Boolean);
+    // rest[0] = username, rest[1] = password (optional)
+    const username = rest[0] || '';
+    const password = rest[1] || '';
+    if (username) acc.push({ email, username, password });
     return acc;
   }, []);
 }
@@ -25,7 +29,7 @@ const STATUS_TABS = [
 const STATUS_LABEL = { pending: 'En attente', assigned: 'Assigné', active: 'Actif' };
 const STATUS_ICON  = { pending: AlertCircle, assigned: UserCheck, active: Activity };
 
-export default function Accounts({ accounts, translators, onUpdate, onDelete }) {
+export default function Accounts({ accounts, translators, companies = [], onAdd, onUpdate, onDelete }) {
   const [usernames, setUsernames]   = useState({});
   const [filter, setFilter]         = useState('all');
   const [company, setCompany]       = useState('all');
@@ -52,17 +56,42 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
 
   const analyzePaste = () => {
     const pairs = parseUsernamePaste(pasteText);
-    const results = pairs.map(({ email, username }) => {
-      const acc = accounts.find(a => a.email.toLowerCase() === email.toLowerCase());
-      return { email, username, account: acc || null };
+    const results = pairs.map(({ email, username, password }) => {
+      const existing = accounts.find(a => a.email.toLowerCase() === email.toLowerCase());
+      const company  = password ? (companies.find(c => c.password === password) || null) : null;
+      return { email, username, password, account: existing || null, company };
     });
     setPasteMatches(results);
   };
 
   const applyUsernames = () => {
-    const matched = pasteMatches.filter(r => r.account);
-    matched.forEach(r => onUpdate(r.account.id, { username: r.username, status: 'active' }));
-    toast(`${matched.length} username${matched.length > 1 ? 's' : ''} mis à jour ✓`);
+    let updated = 0, created = 0;
+    pasteMatches.forEach(r => {
+      if (r.account) {
+        // Compte existant → mettre à jour username + société si détectée
+        const update = { username: r.username, status: 'active' };
+        if (r.company) update.company = r.company.name;
+        onUpdate(r.account.id, update);
+        updated++;
+      } else if (onAdd) {
+        // Nouveau compte → créer
+        onAdd({
+          email:        r.email,
+          pass:         r.password || '',
+          username:     r.username,
+          company:      r.company?.name || '',
+          key:          '',
+          lang:         '',
+          accid:        '',
+          notes:        '',
+          translatorId: null,
+          status:       'active',
+        });
+        created++;
+      }
+    });
+    const msg = [updated && `${updated} mis à jour`, created && `${created} créé${created > 1 ? 's' : ''}`].filter(Boolean).join(', ');
+    toast(`${msg} ✓`);
     setPasteText(''); setPasteMatches(null); setShowPaste(false);
   };
 
@@ -70,8 +99,8 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
   const assigned = accounts.filter(a => a.status === 'assigned').length;
   const active   = accounts.filter(a => a.status === 'active').length;
 
-  // Sociétés connues
-  const companies = [...new Set(accounts.map(a => a.company).filter(Boolean))].sort();
+  // Noms de sociétés présents dans les comptes (pour les filtres)
+  const companyNames = [...new Set(accounts.map(a => a.company).filter(Boolean))].sort();
 
   const filtered = [...accounts].reverse().filter(a => {
     const matchFilter  = filter === 'all' || a.status === filter;
@@ -111,9 +140,9 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
             Demande aux traducteurs d'envoyer leur <strong>email : username</strong> dans le groupe WhatsApp, puis colle tout ici.
           </p>
           <div style={{ background: 'var(--surface2)', border: '1px dashed var(--blue-border)', borderRadius: 7, padding: '8px 10px', fontFamily: 'monospace', fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>
-            Exemple :<br/>
-            john@gmail.com : john_doe_123<br/>
-            marie@outlook.com : marie_tr456
+            Format : <strong>email : username : motdepasse</strong><br/>
+            john@gmail.com : john_doe_123 : Password@2026<br/>
+            marie@outlook.com : marie_tr456 : Password@2026
           </div>
 
           {!pasteMatches ? (
@@ -134,26 +163,28 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
                 {pasteMatches.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: r.account ? 'var(--green-bg)' : '#fff7ed', border: `1px solid ${r.account ? 'var(--green-border)' : 'var(--amber-border)'}` }}>
-                    <div>
+                  <div key={i} style={{ padding: '9px 12px', borderRadius: 8, background: r.account ? 'var(--green-bg)' : 'var(--blue-bg)', border: `1px solid ${r.account ? 'var(--green-border)' : 'var(--blue-border)'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{r.email}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
-                        → <span style={{ fontFamily: 'monospace', fontWeight: 700, color: r.account ? 'var(--green)' : 'var(--amber)' }}>{r.username}</span>
-                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: r.account ? 'var(--green-bg)' : 'var(--blue-bg)', color: r.account ? 'var(--green)' : 'var(--blue)', border: `1px solid ${r.account ? 'var(--green-border)' : 'var(--blue-border)'}` }}>
+                        {r.account ? '✏ Mise à jour' : '+ Nouveau compte'}
+                      </span>
                     </div>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: r.account ? 'var(--green-bg)' : 'var(--amber-bg)', color: r.account ? 'var(--green)' : 'var(--amber)', border: `1px solid ${r.account ? 'var(--green-border)' : 'var(--amber-border)'}` }}>
-                      {r.account ? '✓ Trouvé' : '✗ Inconnu'}
-                    </span>
+                    <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <span>Username : <strong style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{r.username}</strong></span>
+                      {r.company && <span>Société : <strong style={{ color: 'var(--blue)' }}>{r.company.name}</strong></span>}
+                      {r.password && !r.company && <span style={{ color: 'var(--amber)' }}>Société non reconnue</span>}
+                    </div>
                   </div>
                 ))}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: 'var(--text2)' }}>
-                  {pasteMatches.filter(r => r.account).length} correspondance{pasteMatches.filter(r => r.account).length > 1 ? 's' : ''} sur {pasteMatches.length}
+                  {pasteMatches.filter(r => r.account).length} mise{pasteMatches.filter(r => r.account).length > 1 ? 's' : ''} à jour · {pasteMatches.filter(r => !r.account).length} nouveau{pasteMatches.filter(r => !r.account).length > 1 ? 'x' : ''}
                 </span>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn" onClick={() => setPasteMatches(null)}>Recoller</button>
-                  <button className="btn primary" onClick={applyUsernames} disabled={!pasteMatches.some(r => r.account)}>
+                  <button className="btn primary" onClick={applyUsernames}>
                     <Check size={13} /> Appliquer
                   </button>
                 </div>
@@ -225,7 +256,7 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
           </div>
 
           {/* Filtre par société */}
-          {companies.length > 0 && (
+          {companyNames.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text2)', fontWeight: 600, marginRight: 2 }}>
                 <Building2 size={11} /> Société :
@@ -234,7 +265,7 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
                 style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: company === 'all' ? 'var(--text)' : 'var(--surface)', color: company === 'all' ? '#fff' : 'var(--text2)' }}>
                 Toutes <span style={{ opacity: .6 }}>{accounts.length}</span>
               </button>
-              {companies.map(c => {
+              {companyNames.map(c => {
                 const count = accounts.filter(a => a.company === c).length;
                 return (
                   <button key={c} onClick={() => setCompany(c)}
