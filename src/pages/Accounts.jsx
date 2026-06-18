@@ -224,7 +224,7 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
                           }}
                         >
                           <option value="">Non assigné</option>
-                          {translators.map(t => (
+                          {[...translators].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map(t => (
                             <option key={t.id} value={t.id}>{t.name}</option>
                           ))}
                         </select>
