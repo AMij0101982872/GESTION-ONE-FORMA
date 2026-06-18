@@ -87,6 +87,8 @@ export default function NewAccount({ translators, accounts, companies = [], onAd
 
   const submit = () => {
     if (!form.email || !form.pass) { toast('Email et mot de passe obligatoires'); return; }
+    const duplicate = accounts.find(a => a.email.toLowerCase() === form.email.toLowerCase());
+    if (duplicate) { toast(`❌ Ce mail existe déjà (${duplicate.email})`); return; }
     onAdd({ ...form, translatorId: form.translatorId || null });
     reset();
     toast('Compte enregistré' + (form.translatorId ? ' et assigné ✓' : ''));
