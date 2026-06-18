@@ -67,9 +67,9 @@ export default function Translators({ translators, accounts, payments, onAdd, on
   const totalDue      = payments.filter(p => !p.paid).reduce((s, p) => s + p.totalPrice, 0);
   const maxWords      = Math.max(...translators.map(t => payments.filter(p => p.translatorId === t.id).reduce((s, p) => s + (p.paidWords || 0), 0)), 1);
 
-  const filtered = translators.filter(t =>
-    !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.contact?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = translators
+    .filter(t => !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.contact?.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
   return (
     <div>

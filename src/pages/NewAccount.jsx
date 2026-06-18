@@ -40,6 +40,12 @@ export default function NewAccount({ translators, accounts, companies = [], onAd
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  const selectCompany = (name) => {
+    const match = companies.find(c => c.name === name);
+    setForm(f => ({ ...f, company: name, pass: match ? match.password : f.pass }));
+    if (match) setCompanySuggestion(name);
+  };
+
   // Noms des sociétés connues pour les suggestions manuelles
   const knownCompanies = companies.map(c => c.name);
 
@@ -203,7 +209,7 @@ export default function NewAccount({ translators, accounts, companies = [], onAd
                 <Building2 size={12} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
                 <input
                   value={form.company}
-                  onChange={e => set('company', e.target.value)}
+                  onChange={e => selectCompany(e.target.value)}
                   placeholder="ex: Société A, Transperfect, RWS…"
                   list="company-list"
                   style={{ paddingLeft: 30 }}
@@ -215,7 +221,7 @@ export default function NewAccount({ translators, accounts, companies = [], onAd
               {knownCompanies.length > 0 && !form.company && (
                 <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
                   {knownCompanies.map(c => (
-                    <button key={c} onClick={() => set('company', c)}
+                    <button key={c} onClick={() => selectCompany(c)}
                       style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--blue-border)', borderRadius: 5, background: 'var(--blue-bg)', color: 'var(--blue)', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
                       {c}
                     </button>
@@ -243,7 +249,7 @@ export default function NewAccount({ translators, accounts, companies = [], onAd
                 ) : (
                   <select value={form.translatorId} onChange={e => set('translatorId', e.target.value)}>
                     <option value="">— Non assigné —</option>
-                    {translators.map(t => (
+                    {[...translators].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map(t => (
                       <option key={t.id} value={t.id}>{t.name}{t.contact ? ` · ${t.contact}` : ''}</option>
                     ))}
                   </select>
