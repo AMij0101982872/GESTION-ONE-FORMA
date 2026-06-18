@@ -1,7 +1,19 @@
 import { useState } from 'react';
-import { Check, Trash2, Search, LayoutGrid, AlertCircle, UserCheck, Activity, Building2 } from 'lucide-react';
+import { Check, Trash2, Search, LayoutGrid, AlertCircle, UserCheck, Activity, Building2, ClipboardPaste, X } from 'lucide-react';
 import { toast } from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
+
+function parseUsernamePaste(text) {
+  const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+  return lines.reduce((acc, line) => {
+    const emailMatch = line.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+    if (!emailMatch) return acc;
+    const email    = emailMatch[0];
+    const username = line.replace(email, '').replace(/^[\s:|\-]+|[\s:|\-]+$/g, '').trim();
+    if (username) acc.push({ email, username });
+    return acc;
+  }, []);
+}
 
 const STATUS_TABS = [
   { key: 'all',      label: 'Tous',        color: null },
@@ -14,11 +26,14 @@ const STATUS_LABEL = { pending: 'En attente', assigned: 'Assigné', active: 'Act
 const STATUS_ICON  = { pending: AlertCircle, assigned: UserCheck, active: Activity };
 
 export default function Accounts({ accounts, translators, onUpdate, onDelete }) {
-  const [usernames, setUsernames] = useState({});
-  const [filter, setFilter]       = useState('all');
-  const [company, setCompany]     = useState('all');
-  const [search, setSearch]       = useState('');
-  const [confirmId, setConfirmId] = useState(null);
+  const [usernames, setUsernames]   = useState({});
+  const [filter, setFilter]         = useState('all');
+  const [company, setCompany]       = useState('all');
+  const [search, setSearch]         = useState('');
+  const [confirmId, setConfirmId]   = useState(null);
+  const [showPaste, setShowPaste]   = useState(false);
+  const [pasteText, setPasteText]   = useState('');
+  const [pasteMatches, setPasteMatches] = useState(null);
 
   const setUn = (id, val) => setUsernames(u => ({ ...u, [id]: val }));
 
@@ -33,6 +48,22 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
   const reassign = (id, tid) => {
     onUpdate(id, { translatorId: tid || null, status: tid ? 'assigned' : 'pending' });
     toast(tid ? 'Compte assigné ✓' : 'Désassigné');
+  };
+
+  const analyzePaste = () => {
+    const pairs = parseUsernamePaste(pasteText);
+    const results = pairs.map(({ email, username }) => {
+      const acc = accounts.find(a => a.email.toLowerCase() === email.toLowerCase());
+      return { email, username, account: acc || null };
+    });
+    setPasteMatches(results);
+  };
+
+  const applyUsernames = () => {
+    const matched = pasteMatches.filter(r => r.account);
+    matched.forEach(r => onUpdate(r.account.id, { username: r.username, status: 'active' }));
+    toast(`${matched.length} username${matched.length > 1 ? 's' : ''} mis à jour ✓`);
+    setPasteText(''); setPasteMatches(null); setShowPaste(false);
   };
 
   const pending  = accounts.filter(a => a.status === 'pending').length;
@@ -59,6 +90,78 @@ export default function Accounts({ accounts, translators, onUpdate, onDelete }) 
           <p>Gestion des comptes, assignations et usernames</p>
         </div>
       </div>
+
+      {/* Zone collage usernames */}
+      {!showPaste ? (
+        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button className="btn" onClick={() => setShowPaste(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ClipboardPaste size={13} /> Coller usernames WhatsApp
+          </button>
+        </div>
+      ) : (
+        <div className="card" style={{ marginBottom: '1rem', borderColor: 'var(--blue-border)', background: 'var(--blue-bg)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ marginBottom: 0, color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 7 }}>
+              <ClipboardPaste size={14} /> Mise à jour groupée des usernames
+            </h3>
+            <button className="btn sm icon" onClick={() => { setShowPaste(false); setPasteText(''); setPasteMatches(null); }}><X size={13} /></button>
+          </div>
+
+          <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
+            Demande aux traducteurs d'envoyer leur <strong>email : username</strong> dans le groupe WhatsApp, puis colle tout ici.
+          </p>
+          <div style={{ background: 'var(--surface2)', border: '1px dashed var(--blue-border)', borderRadius: 7, padding: '8px 10px', fontFamily: 'monospace', fontSize: 11, color: 'var(--text2)', marginBottom: 12 }}>
+            Exemple :<br/>
+            john@gmail.com : john_doe_123<br/>
+            marie@outlook.com : marie_tr456
+          </div>
+
+          {!pasteMatches ? (
+            <>
+              <textarea
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                placeholder={"Colle ici les réponses du groupe WhatsApp..."}
+                style={{ width: '100%', minHeight: 100, fontFamily: 'ui-monospace, monospace', fontSize: 12, padding: '10px 12px', borderRadius: 'var(--radius)', border: '1.5px solid var(--border2)', background: 'var(--surface)', color: 'var(--text)', resize: 'none', outline: 'none', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button className="btn primary" onClick={analyzePaste} disabled={!pasteText.trim()}>
+                  <Check size={13} /> Analyser
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                {pasteMatches.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: r.account ? 'var(--green-bg)' : '#fff7ed', border: `1px solid ${r.account ? 'var(--green-border)' : 'var(--amber-border)'}` }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{r.email}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 2 }}>
+                        → <span style={{ fontFamily: 'monospace', fontWeight: 700, color: r.account ? 'var(--green)' : 'var(--amber)' }}>{r.username}</span>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 5, background: r.account ? 'var(--green-bg)' : 'var(--amber-bg)', color: r.account ? 'var(--green)' : 'var(--amber)', border: `1px solid ${r.account ? 'var(--green-border)' : 'var(--amber-border)'}` }}>
+                      {r.account ? '✓ Trouvé' : '✗ Inconnu'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+                  {pasteMatches.filter(r => r.account).length} correspondance{pasteMatches.filter(r => r.account).length > 1 ? 's' : ''} sur {pasteMatches.length}
+                </span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" onClick={() => setPasteMatches(null)}>Recoller</button>
+                  <button className="btn primary" onClick={applyUsernames} disabled={!pasteMatches.some(r => r.account)}>
+                    <Check size={13} /> Appliquer
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="stats-row">
