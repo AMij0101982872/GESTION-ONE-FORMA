@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, Trash2, Search, LayoutGrid, AlertCircle, UserCheck, Activity, Building2, ClipboardPaste, X } from 'lucide-react';
 import { toast } from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
-import { LANG_PAIRS } from '../constants/langs';
+import LangSelect from '../components/LangSelect';
 
 function parseUsernamePaste(text) {
   const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
@@ -348,27 +348,11 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
                       </td>
 
                       {/* Langue */}
-                      <td style={{ minWidth: 180 }}>
-                        <select
+                      <td style={{ minWidth: 200 }}>
+                        <LangSelect
                           value={acc.lang ?? ''}
-                          onChange={e => {
-                            onUpdate(acc.id, { lang: e.target.value });
-                            toast('Langue enregistrée ✓');
-                          }}
-                          style={{
-                            width: '100%', padding: '5px 8px', fontSize: 11,
-                            border: `1.5px solid ${acc.lang ? 'var(--green-border)' : 'var(--border)'}`,
-                            borderRadius: 'var(--radius)',
-                            background: acc.lang ? 'var(--green-bg)' : 'var(--surface2)',
-                            color: acc.lang ? 'var(--text)' : 'var(--text2)',
-                            fontWeight: acc.lang ? 600 : 400,
-                            fontFamily: 'inherit',
-                            outline: 'none', cursor: 'pointer',
-                          }}
-                        >
-                          <option value="">— Choisir une paire —</option>
-                          {LANG_PAIRS.map(l => <option key={l} value={l}>{l}</option>)}
-                        </select>
+                          onChange={val => { onUpdate(acc.id, { lang: val }); toast('Langue enregistrée ✓'); }}
+                        />
                       </td>
 
                       {/* Traducteur */}
