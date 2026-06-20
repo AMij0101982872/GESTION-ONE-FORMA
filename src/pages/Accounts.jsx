@@ -31,6 +31,7 @@ const STATUS_ICON  = { pending: AlertCircle, assigned: UserCheck, active: Activi
 
 export default function Accounts({ accounts, translators, companies = [], onAdd, onUpdate, onDelete }) {
   const [usernames, setUsernames]   = useState({});
+  const [langs, setLangs]           = useState({});
   const [filter, setFilter]         = useState('all');
   const [company, setCompany]       = useState('all');
   const [search, setSearch]         = useState('');
@@ -39,7 +40,8 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
   const [pasteText, setPasteText]   = useState('');
   const [pasteMatches, setPasteMatches] = useState(null);
 
-  const setUn = (id, val) => setUsernames(u => ({ ...u, [id]: val }));
+  const setUn  = (id, val) => setUsernames(u => ({ ...u, [id]: val }));
+  const setLng = (id, val) => setLangs(l => ({ ...l, [id]: val }));
 
   const saveUsername = (acc) => {
     const val = (usernames[acc.id] ?? acc.username ?? '').trim();
@@ -47,6 +49,13 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
     onUpdate(acc.id, { username: val, status: 'active' });
     setUsernames(u => { const n = { ...u }; delete n[acc.id]; return n; });
     toast('Username enregistré ✓');
+  };
+
+  const saveLang = (acc) => {
+    const val = (langs[acc.id] ?? acc.lang ?? '').trim();
+    onUpdate(acc.id, { lang: val });
+    setLangs(l => { const n = { ...l }; delete n[acc.id]; return n; });
+    toast('Langue enregistrée ✓');
   };
 
   const reassign = (id, tid) => {
@@ -101,6 +110,8 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
 
   // Noms de sociétés présents dans les comptes (pour les filtres)
   const companyNames = [...new Set(accounts.map(a => a.company).filter(Boolean))].sort();
+  // Paires de langues connues (pour autocomplétion)
+  const knownLangs = [...new Set(accounts.map(a => a.lang).filter(Boolean))].sort();
 
   const filtered = [...accounts].reverse().filter(a => {
     const matchFilter  = filter === 'all' || a.status === filter;
@@ -336,11 +347,38 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
                       </td>
 
                       {/* Langue */}
-                      <td>
-                        {acc.lang
-                          ? <span className="lang-tag">{acc.lang}</span>
-                          : <span style={{ fontSize: 11, color: 'var(--text3)' }}>—</span>
-                        }
+                      <td style={{ minWidth: 160 }}>
+                        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                          <input
+                            value={langs[acc.id] ?? acc.lang ?? ''}
+                            onChange={e => setLng(acc.id, e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && saveLang(acc)}
+                            placeholder="ex: Dutch → FR"
+                            list="lang-list-accounts"
+                            style={{
+                              flex: 1, padding: '4px 8px', fontSize: 11,
+                              border: `1.5px solid ${acc.lang ? 'var(--green-border)' : 'var(--border)'}`,
+                              borderRadius: 'var(--radius)',
+                              background: acc.lang ? 'var(--green-bg)' : 'var(--surface2)',
+                              color: 'var(--text)', outline: 'none',
+                              fontWeight: acc.lang ? 600 : 400,
+                              fontFamily: 'inherit',
+                            }}
+                            onFocus={e => { e.target.style.borderColor = 'var(--accent)'; e.target.style.background = 'var(--surface)'; }}
+                            onBlur={e => {
+                              e.target.style.borderColor = acc.lang ? 'var(--green-border)' : 'var(--border)';
+                              e.target.style.background  = acc.lang ? 'var(--green-bg)' : 'var(--surface2)';
+                            }}
+                          />
+                          {langs[acc.id] !== undefined && langs[acc.id] !== (acc.lang ?? '') && (
+                            <button className="btn sm green" onClick={() => saveLang(acc)} title="Enregistrer">
+                              <Check size={11} />
+                            </button>
+                          )}
+                        </div>
+                        <datalist id="lang-list-accounts">
+                          {knownLangs.map(l => <option key={l} value={l} />)}
+                        </datalist>
                       </td>
 
                       {/* Traducteur */}
