@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, Trash2, Search, LayoutGrid, AlertCircle, UserCheck, Activity, Building2, ClipboardPaste, X } from 'lucide-react';
 import { toast } from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
+import { LANG_PAIRS } from '../constants/langs';
 
 function parseUsernamePaste(text) {
   const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
@@ -347,38 +348,27 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
                       </td>
 
                       {/* Langue */}
-                      <td style={{ minWidth: 160 }}>
-                        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-                          <input
-                            value={langs[acc.id] ?? acc.lang ?? ''}
-                            onChange={e => setLng(acc.id, e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && saveLang(acc)}
-                            placeholder="ex: Dutch → FR"
-                            list="lang-list-accounts"
-                            style={{
-                              flex: 1, padding: '4px 8px', fontSize: 11,
-                              border: `1.5px solid ${acc.lang ? 'var(--green-border)' : 'var(--border)'}`,
-                              borderRadius: 'var(--radius)',
-                              background: acc.lang ? 'var(--green-bg)' : 'var(--surface2)',
-                              color: 'var(--text)', outline: 'none',
-                              fontWeight: acc.lang ? 600 : 400,
-                              fontFamily: 'inherit',
-                            }}
-                            onFocus={e => { e.target.style.borderColor = 'var(--accent)'; e.target.style.background = 'var(--surface)'; }}
-                            onBlur={e => {
-                              e.target.style.borderColor = acc.lang ? 'var(--green-border)' : 'var(--border)';
-                              e.target.style.background  = acc.lang ? 'var(--green-bg)' : 'var(--surface2)';
-                            }}
-                          />
-                          {langs[acc.id] !== undefined && langs[acc.id] !== (acc.lang ?? '') && (
-                            <button className="btn sm green" onClick={() => saveLang(acc)} title="Enregistrer">
-                              <Check size={11} />
-                            </button>
-                          )}
-                        </div>
-                        <datalist id="lang-list-accounts">
-                          {knownLangs.map(l => <option key={l} value={l} />)}
-                        </datalist>
+                      <td style={{ minWidth: 180 }}>
+                        <select
+                          value={acc.lang ?? ''}
+                          onChange={e => {
+                            onUpdate(acc.id, { lang: e.target.value });
+                            toast('Langue enregistrée ✓');
+                          }}
+                          style={{
+                            width: '100%', padding: '5px 8px', fontSize: 11,
+                            border: `1.5px solid ${acc.lang ? 'var(--green-border)' : 'var(--border)'}`,
+                            borderRadius: 'var(--radius)',
+                            background: acc.lang ? 'var(--green-bg)' : 'var(--surface2)',
+                            color: acc.lang ? 'var(--text)' : 'var(--text2)',
+                            fontWeight: acc.lang ? 600 : 400,
+                            fontFamily: 'inherit',
+                            outline: 'none', cursor: 'pointer',
+                          }}
+                        >
+                          <option value="">— Choisir une paire —</option>
+                          {LANG_PAIRS.map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
                       </td>
 
                       {/* Traducteur */}
