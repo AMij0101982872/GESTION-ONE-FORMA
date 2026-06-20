@@ -31,7 +31,7 @@ function Field({ label, required, children }) {
   );
 }
 
-export default function NewAccount({ translators, accounts, companies = [], onAdd }) {
+export default function NewAccount({ translators, accounts = [], companies = [], onAdd }) {
   const [form, setForm]         = useState(empty);
   const [pasteText, setPasteText] = useState('');
   const [parsed, setParsed]     = useState(null);
@@ -48,6 +48,9 @@ export default function NewAccount({ translators, accounts, companies = [], onAd
 
   // Noms des sociétés connues pour les suggestions manuelles
   const knownCompanies = companies.map(c => c.name);
+
+  // Paires de langues déjà utilisées (extraites des comptes existants)
+  const knownLangs = [...new Set(accounts.map(a => a.lang).filter(Boolean))].sort();
 
   const handlePaste = (e) => {
     const text = e.clipboardData.getData('text');
@@ -234,7 +237,25 @@ export default function NewAccount({ translators, accounts, companies = [], onAd
 
             <div className="row2">
               <Field label="Paire de langue">
-                <input value={form.lang} onChange={e => set('lang', e.target.value)} placeholder="ex: Dutch → Ukrainian" />
+                <input
+                  value={form.lang}
+                  onChange={e => set('lang', e.target.value)}
+                  placeholder="ex: Dutch → Ukrainian"
+                  list="lang-list"
+                />
+                <datalist id="lang-list">
+                  {knownLangs.map(l => <option key={l} value={l} />)}
+                </datalist>
+                {knownLangs.length > 0 && !form.lang && (
+                  <div style={{ display: 'flex', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
+                    {knownLangs.map(l => (
+                      <button key={l} onClick={() => set('lang', l)}
+                        style={{ fontSize: 10, padding: '2px 8px', border: '1px solid var(--border)', borderRadius: 5, background: 'var(--surface2)', color: 'var(--text2)', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </Field>
               <Field label="Clé d'authentification">
                 <input value={form.key} onChange={e => set('key', e.target.value)} placeholder="token / 2FA key" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }} />
