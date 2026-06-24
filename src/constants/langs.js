@@ -6,6 +6,7 @@ export const LANG_PAIRS = [
   'English → Czech',
   'English → Danish',
   'English → Dutch',
+  'English → Estonian',
   'English → Finnish',
   'English → French',
   'English → German',
