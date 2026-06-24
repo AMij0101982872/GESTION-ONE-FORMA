@@ -1,6 +1,7 @@
 export const LANG_PAIRS = [
   // Anglais → autres
   'English → Arabic',
+  'English → Bulgarian',
   'English → Chinese (Simplified)',
   'English → Chinese (Traditional)',
   'English → Czech',
