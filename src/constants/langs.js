@@ -23,6 +23,7 @@ export const LANG_PAIRS = [
   'English → Portuguese',
   'English → Romanian',
   'English → Russian',
+  'English → Slovenian',
   'English → Spanish',
   'English → Swedish',
   'English → Thai',
