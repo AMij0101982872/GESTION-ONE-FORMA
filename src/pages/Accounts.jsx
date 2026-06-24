@@ -35,6 +35,7 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
   const [langs, setLangs]           = useState({});
   const [filter, setFilter]         = useState('all');
   const [company, setCompany]       = useState('all');
+  const [translator, setTranslator] = useState('all');
   const [search, setSearch]         = useState('');
   const [confirmId, setConfirmId]   = useState(null);
   const [showPaste, setShowPaste]   = useState(false);
@@ -115,11 +116,12 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
   const knownLangs = [...new Set(accounts.map(a => a.lang).filter(Boolean))].sort();
 
   const filtered = [...accounts].reverse().filter(a => {
-    const matchFilter  = filter === 'all' || a.status === filter;
-    const matchCompany = company === 'all' || (a.company || '') === company;
+    const matchFilter     = filter === 'all' || a.status === filter;
+    const matchCompany    = company === 'all' || (a.company || '') === company;
+    const matchTranslator = translator === 'all' || a.translatorId === translator;
     const q = search.toLowerCase();
-    const matchSearch  = !q || a.email?.toLowerCase().includes(q) || a.accid?.toLowerCase().includes(q) || a.username?.toLowerCase().includes(q) || a.lang?.toLowerCase().includes(q) || a.company?.toLowerCase().includes(q);
-    return matchFilter && matchCompany && matchSearch;
+    const matchSearch     = !q || a.email?.toLowerCase().includes(q) || a.accid?.toLowerCase().includes(q) || a.username?.toLowerCase().includes(q) || a.lang?.toLowerCase().includes(q) || a.company?.toLowerCase().includes(q);
+    return matchFilter && matchCompany && matchTranslator && matchSearch;
   });
 
   return (
@@ -283,6 +285,28 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
                   <button key={c} onClick={() => setCompany(c)}
                     style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--blue-border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: company === c ? 'var(--blue)' : 'var(--blue-bg)', color: company === c ? '#fff' : 'var(--blue)', transition: 'all .12s' }}>
                     {c} <span style={{ opacity: .7 }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Filtre par traducteur */}
+          {translators.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text2)', fontWeight: 600, marginRight: 2 }}>
+                <UserCheck size={11} /> Traducteur :
+              </div>
+              <button onClick={() => setTranslator('all')}
+                style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: translator === 'all' ? 'var(--text)' : 'var(--surface)', color: translator === 'all' ? '#fff' : 'var(--text2)' }}>
+                Tous <span style={{ opacity: .6 }}>{accounts.length}</span>
+              </button>
+              {[...translators].sort((a, b) => a.name.localeCompare(b.name, 'fr')).map(t => {
+                const count = accounts.filter(a => a.translatorId === t.id).length;
+                return (
+                  <button key={t.id} onClick={() => setTranslator(t.id)}
+                    style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: translator === t.id ? 'var(--text)' : 'var(--surface)', color: translator === t.id ? '#fff' : 'var(--text2)', transition: 'all .12s' }}>
+                    {t.name} <span style={{ opacity: .6 }}>{count}</span>
                   </button>
                 );
               })}
@@ -454,8 +478,8 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
           <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text3)', textAlign: 'right' }}>
             {filtered.length} compte{filtered.length > 1 ? 's' : ''} affiché{filtered.length > 1 ? 's' : ''}
             {filter !== 'all' || search ? ` · ` : ''}
-            {(filter !== 'all' || company !== 'all' || search) && (
-              <button onClick={() => { setFilter('all'); setCompany('all'); setSearch(''); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
+            {(filter !== 'all' || company !== 'all' || translator !== 'all' || search) && (
+              <button onClick={() => { setFilter('all'); setCompany('all'); setTranslator('all'); setSearch(''); }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
                 Réinitialiser les filtres
               </button>
             )}
