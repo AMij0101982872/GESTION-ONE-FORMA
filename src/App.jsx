@@ -36,40 +36,23 @@ const NAV_SECTIONS = [
   },
 ];
 
-export default function App() {
-  const [page, setPage]       = useState('dashboard');
-  const [session, setSession] = useState(undefined); // undefined = chargement, null = non connecté
-  const store = useStore();
+const LoadingScreen = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', flexDirection: 'column', gap: 12 }}>
+    <div style={{ width: 36, height: 36, background: '#111827', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>B</span>
+    </div>
+    <p style={{ color: 'var(--text2)', fontSize: 13, fontWeight: 600 }}>Connexion à la base de données…</p>
+  </div>
+);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s ?? null);
-    });
-    return () => listener.subscription.unsubscribe();
-  }, []);
+/* ── App principale — useStore monté UNIQUEMENT après session confirmée ── */
+function MainApp({ session }) {
+  const [page, setPage] = useState('dashboard');
+  const store = useStore();
 
   const logout = () => supabase.auth.signOut();
 
-  // Écran de chargement initial (auth + données)
-  if (session === undefined || store.loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg)', flexDirection: 'column', gap: 12 }}>
-      <div style={{ width: 36, height: 36, background: '#111827', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>B</span>
-      </div>
-      <p style={{ color: 'var(--text2)', fontSize: 13, fontWeight: 600 }}>Connexion à la base de données…</p>
-    </div>
-  );
-
-  // Page de login si non authentifié
-  if (!session) return (
-    <>
-      <Login />
-      <Toast />
-    </>
-  );
+  if (store.loading) return <LoadingScreen />;
 
   const pages = {
     dashboard:   <Dashboard accounts={store.accounts} translators={store.translators} payments={store.payments} rate={store.rate} deduction={store.deduction} onNavigate={setPage} />,
@@ -157,4 +140,23 @@ export default function App() {
       <Toast />
     </div>
   );
+}
+
+/* ── Point d'entrée — gère uniquement l'auth ── */
+export default function App() {
+  const [session, setSession] = useState(undefined);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s ?? null);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) return <><LoadingScreen /><Toast /></>;
+  if (!session)              return <><Login /><Toast /></>;
+  return <MainApp session={session} />;
 }
