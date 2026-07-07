@@ -16,35 +16,69 @@ const emptyForm = {
   period: currentPeriod(),
 };
 
+function matchAccount(accounts, val) {
+  const v = val.toLowerCase();
+  return accounts.find(a =>
+    (a.username && a.username.toLowerCase() === v) ||
+    (a.accid    && a.accid.toLowerCase()    === v)
+  );
+}
+
 function rowsFromMatrix(matrix, accounts) {
   if (!matrix.length) return [];
+
+  // Trouver la ligne d'en-tête
   let headerIdx = matrix.findIndex(row =>
-    row.some(c => /^account$/i.test(String(c).trim()) || /^translator$/i.test(String(c).trim()))
+    row.some(c => /^(account|translator|username|webapp)$/i.test(String(c).trim()))
   );
   if (headerIdx === -1) headerIdx = 0;
   const header = matrix[headerIdx].map(c => String(c || '').trim().toLowerCase());
+
+  // ── Format OneForma : colonnes Webapp / Username / Contractor ID / Submitted Hits / % to pay / discount ──
+  const usernameCol = header.findIndex(h => h === 'username');
+  if (usernameCol !== -1) {
+    const webappCol   = header.findIndex(h => h === 'webapp');
+    const hitsCol     = header.findIndex(h => /submitted.?hits/i.test(h));
+    const pctCol      = header.findIndex(h => /% to pay/i.test(h) || h === '% to pay');
+    const discountCol = header.findIndex(h => h === 'discount');
+
+    return matrix.slice(headerIdx + 1)
+      .filter(row => {
+        const username = String(row[usernameCol] || '').trim();
+        const discount = parseFloat(String(row[discountCol] || '0').replace('%','')) || 0;
+        const pct      = String(row[pctCol] || '').replace('%','').trim();
+        return username && discount > 0 && pct !== '0';
+      })
+      .map(row => {
+        const accountVal = String(row[usernameCol] || '').trim();
+        const taskName   = String(row[webappCol]   || '').trim();
+        const totalHits  = parseInt(row[hitsCol])  || 0;
+        const paidWords  = parseFloat(String(row[discountCol] || '0')) || 0;
+        const acc        = matchAccount(accounts, accountVal);
+        return { accountVal, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc };
+      })
+      .filter(r => r.accountVal);
+  }
+
+  // ── Format standard ──
   const off = /translator/.test(header[0]) ? 1 : 0;
-  const dataRows = matrix.slice(headerIdx + 1).filter(row => {
-    const first = String(row[off] || '').trim();
-    return first && !/^total/i.test(first);
-  });
-  return dataRows.map(row => {
-    const c = (i) => String(row[off + i] ?? '').trim();
-    const accountVal = c(0);
-    const taskName   = c(1);
-    const totalHits  = parseInt(c(2)) || 0;
-    const timeSpent  = parseFloat(c(4)) || 0;
-    const qaRaw      = parseFloat(c(5)) || 100;
-    const qaScore    = qaRaw > 1 ? qaRaw / 100 : qaRaw;
-    const paidWords  = parseInt(c(6)) || parseInt(c(3)) || 0;
-    const pricePer1k = parseFloat(c(8).replace(/[$,]/g, '')) || 10;
-    const totalPrice = parseFloat(c(9).replace(/[$,]/g, '')) || 0;
-    const acc = accounts.find(a =>
-      (a.username && a.username.toLowerCase() === accountVal.toLowerCase()) ||
-      (a.accid    && a.accid.toLowerCase()    === accountVal.toLowerCase())
-    );
-    return { accountVal, taskName, totalHits, timeSpent, qaScore, paidWords, pricePer1k, totalPrice, acc };
-  }).filter(r => r.accountVal && r.taskName);
+  return matrix.slice(headerIdx + 1)
+    .filter(row => { const f = String(row[off] || '').trim(); return f && !/^total/i.test(f); })
+    .map(row => {
+      const c = (i) => String(row[off + i] ?? '').trim();
+      const accountVal = c(0);
+      const taskName   = c(1);
+      const totalHits  = parseInt(c(2))                          || 0;
+      const timeSpent  = parseFloat(c(4))                        || 0;
+      const qaRaw      = parseFloat(c(5))                        || 100;
+      const qaScore    = qaRaw > 1 ? qaRaw / 100 : qaRaw;
+      const paidWords  = parseInt(c(6)) || parseInt(c(3))        || 0;
+      const pricePer1k = parseFloat(c(8).replace(/[$,]/g, ''))  || 10;
+      const totalPrice = parseFloat(c(9).replace(/[$,]/g, ''))  || 0;
+      const acc        = matchAccount(accounts, accountVal);
+      return { accountVal, taskName, totalHits, timeSpent, qaScore, paidWords, pricePer1k, totalPrice, acc };
+    })
+    .filter(r => r.accountVal && r.taskName);
 }
 
 export default function Payments({ payments, accounts, translators, onAdd, onMarkPaid, onDelete, rate, deduction, onSetRate, onSetDeduction }) {
