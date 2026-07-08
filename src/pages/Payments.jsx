@@ -27,44 +27,55 @@ function matchAccount(accounts, val) {
 function rowsFromMatrix(matrix, accounts) {
   if (!matrix.length) return [];
 
-  // Trouver la ligne d'en-tête (contient "username" ou "webapp" ou "account")
   let headerIdx = matrix.findIndex(row =>
     row.some(c => /user|webapp|account|translator/i.test(String(c).trim()))
   );
   if (headerIdx === -1) headerIdx = 0;
   const header = matrix[headerIdx].map(c => String(c || '').trim().toLowerCase());
 
-  // ── Format OneForma : détection par présence de "user" ET "discount" ──
+  console.log('Header détecté à la ligne', headerIdx, ':', header);
+
   const usernameCol = header.findIndex(h => /user/i.test(h));
   const discountCol = header.findIndex(h => /discount/i.test(h));
+
+  console.log('usernameCol:', usernameCol, ' discountCol:', discountCol);
 
   if (usernameCol !== -1 && discountCol !== -1) {
     const webappCol = header.findIndex(h => /webapp|app/i.test(h));
     const hitsCol   = header.findIndex(h => /hit|submit/i.test(h));
-    const pctCol    = header.findIndex(h => /%|pay/i.test(h));
+
+    console.log('Format OneForma — webappCol:', webappCol, ' hitsCol:', hitsCol);
 
     let lastUsername = '';
-    return matrix.slice(headerIdx + 1)
-      .map(row => {
-        // Propager le username si la cellule est vide (cellules fusionnées Excel)
-        const rawUsername = String(row[usernameCol] || '').trim();
-        if (rawUsername) lastUsername = rawUsername;
-        const accountVal = lastUsername;
-        if (!accountVal) return null;
+    const dataRows = matrix.slice(headerIdx + 1);
+    console.log('Lignes de données :', dataRows.length);
 
-        const taskName  = webappCol >= 0 ? String(row[webappCol]  || '').trim() : '';
-        const totalHits = hitsCol   >= 0 ? parseInt(row[hitsCol]) || 0 : 0;
+    const results = [];
+    dataRows.forEach((row, i) => {
+      const rawUsername = String(row[usernameCol] || '').trim();
+      if (rawUsername) lastUsername = rawUsername;
+      const accountVal = lastUsername;
 
-        const discRaw   = row[discountCol];
-        const paidWords = parseFloat(String(discRaw ?? '0').replace(/[,%]/g, '')) || 0;
+      const taskName  = webappCol >= 0 ? String(row[webappCol]  || '').trim() : '';
+      const discRaw   = row[discountCol];
+      const paidWords = parseFloat(String(discRaw ?? '0').replace(/[,%]/g, '')) || 0;
 
-        const acc = matchAccount(accounts, accountVal);
-        return { accountVal, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc };
-      })
-      .filter(Boolean);
+      console.log(`  Ligne ${headerIdx + 1 + i}: username="${rawUsername}" → "${accountVal}" | task="${taskName}" | discount="${discRaw}" → ${paidWords}`);
+
+      if (!accountVal) { console.log('    → IGNORÉE (pas de username)'); return; }
+
+      const totalHits = hitsCol >= 0 ? parseInt(row[hitsCol]) || 0 : 0;
+      const acc = matchAccount(accounts, accountVal);
+      if (!acc) console.log(`    → username "${accountVal}" non trouvé dans les comptes`);
+
+      results.push({ accountVal, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc });
+    });
+
+    return results;
   }
 
   // ── Format standard ──
+  console.log('Format standard utilisé');
   const off = /translator/.test(header[0]) ? 1 : 0;
   return matrix.slice(headerIdx + 1)
     .filter(row => { const f = String(row[off] || '').trim(); return f && !/^total/i.test(f); })
@@ -92,6 +103,7 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
   const [rateInput, setRateInput]           = useState(String(rate));
   const [deductionInput, setDeductionInput] = useState(String(deduction));
   const [openPeriods, setOpenPeriods] = useState({});
+  const [rawCount, setRawCount]   = useState(0);
   const [receipt, setReceipt]     = useState(null);
   const [confirmId, setConfirmId] = useState(null);
   const fileRef = useRef();
@@ -119,8 +131,13 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
       const wb = XLSX.read(ev.target.result, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      console.log('=== DEBUG EXCEL ===');
+      console.log('Lignes brutes :', matrix.length);
+      console.log('10 premières lignes :', matrix.slice(0, 10));
       const rows = rowsFromMatrix(matrix, accounts);
-      if (!rows.length) { toast('Aucune ligne trouvée dans ce fichier'); return; }
+      console.log('Lignes parsées :', rows.length);
+      if (!rows.length) { toast(`Aucune ligne trouvée (${matrix.length} lignes brutes)`); return; }
+      setRawCount(matrix.length);
       setPreview(rows);
     };
     reader.readAsArrayBuffer(file);
@@ -269,7 +286,8 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
           <>
             <div style={{ marginBottom: 8, fontSize: 12 }}>
               Rapport pour <strong>{periodLabel(importPeriod)}</strong> —{' '}
-              <strong>{preview.filter(r => r.acc).length}</strong> reconnues,{' '}
+              <strong>{preview.length}</strong> lignes parsées sur <strong>{rawCount}</strong> brutes dans le fichier ·{' '}
+              <strong style={{ color: '#27ae60' }}>{preview.filter(r => r.acc).length}</strong> reconnues,{' '}
               <span style={{ color: '#e74c3c' }}><strong>{preview.filter(r => !r.acc).length}</strong> inconnues</span>
             </div>
             <div className="tbl-wrap">
