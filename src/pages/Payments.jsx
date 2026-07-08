@@ -52,21 +52,8 @@ function rowsFromMatrix(matrix, accounts) {
         const totalHits = hitsCol   >= 0 ? parseInt(row[hitsCol]) || 0 : 0;
 
         // discount peut être un nombre ou une chaîne
-        const discRaw  = row[discountCol];
+        const discRaw   = row[discountCol];
         const paidWords = parseFloat(String(discRaw ?? '0').replace(/[,%]/g, '')) || 0;
-
-        // % to pay : Excel peut envoyer 0, 1, 0.7 (format %) ou "0%", "100%", "70%"
-        let pctVal = 1;
-        if (pctCol >= 0) {
-          const raw = row[pctCol];
-          if (raw !== undefined && raw !== '') {
-            const num = parseFloat(String(raw).replace('%', ''));
-            pctVal = isNaN(num) ? 1 : (num > 1 ? num / 100 : num);
-          }
-        }
-
-        // Ignorer les lignes sans mots ou avec % = 0
-        if (paidWords <= 0 || pctVal === 0) return null;
 
         const acc = matchAccount(accounts, accountVal);
         return { accountVal, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc };
