@@ -43,15 +43,18 @@ function rowsFromMatrix(matrix, accounts) {
     const hitsCol   = header.findIndex(h => /hit|submit/i.test(h));
     const pctCol    = header.findIndex(h => /%|pay/i.test(h));
 
+    let lastUsername = '';
     return matrix.slice(headerIdx + 1)
       .map(row => {
-        const accountVal = String(row[usernameCol] || '').trim();
+        // Propager le username si la cellule est vide (cellules fusionnées Excel)
+        const rawUsername = String(row[usernameCol] || '').trim();
+        if (rawUsername) lastUsername = rawUsername;
+        const accountVal = lastUsername;
         if (!accountVal) return null;
 
         const taskName  = webappCol >= 0 ? String(row[webappCol]  || '').trim() : '';
         const totalHits = hitsCol   >= 0 ? parseInt(row[hitsCol]) || 0 : 0;
 
-        // discount peut être un nombre ou une chaîne
         const discRaw   = row[discountCol];
         const paidWords = parseFloat(String(discRaw ?? '0').replace(/[,%]/g, '')) || 0;
 
