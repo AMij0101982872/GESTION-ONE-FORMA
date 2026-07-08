@@ -27,37 +27,51 @@ function matchAccount(accounts, val) {
 function rowsFromMatrix(matrix, accounts) {
   if (!matrix.length) return [];
 
-  // Trouver la ligne d'en-tête
+  // Trouver la ligne d'en-tête (contient "username" ou "webapp" ou "account")
   let headerIdx = matrix.findIndex(row =>
-    row.some(c => /^(account|translator|username|webapp)$/i.test(String(c).trim()))
+    row.some(c => /user|webapp|account|translator/i.test(String(c).trim()))
   );
   if (headerIdx === -1) headerIdx = 0;
   const header = matrix[headerIdx].map(c => String(c || '').trim().toLowerCase());
 
-  // ── Format OneForma : colonnes Webapp / Username / Contractor ID / Submitted Hits / % to pay / discount ──
-  const usernameCol = header.findIndex(h => h === 'username');
-  if (usernameCol !== -1) {
-    const webappCol   = header.findIndex(h => h === 'webapp');
-    const hitsCol     = header.findIndex(h => /submitted.?hits/i.test(h));
-    const pctCol      = header.findIndex(h => /% to pay/i.test(h) || h === '% to pay');
-    const discountCol = header.findIndex(h => h === 'discount');
+  // ── Format OneForma : détection par présence de "user" ET "discount" ──
+  const usernameCol = header.findIndex(h => /user/i.test(h));
+  const discountCol = header.findIndex(h => /discount/i.test(h));
+
+  if (usernameCol !== -1 && discountCol !== -1) {
+    const webappCol = header.findIndex(h => /webapp|app/i.test(h));
+    const hitsCol   = header.findIndex(h => /hit|submit/i.test(h));
+    const pctCol    = header.findIndex(h => /%|pay/i.test(h));
 
     return matrix.slice(headerIdx + 1)
-      .filter(row => {
-        const username = String(row[usernameCol] || '').trim();
-        const discount = parseFloat(String(row[discountCol] || '0').replace('%','')) || 0;
-        const pct      = String(row[pctCol] || '').replace('%','').trim();
-        return username && discount > 0 && pct !== '0';
-      })
       .map(row => {
         const accountVal = String(row[usernameCol] || '').trim();
-        const taskName   = String(row[webappCol]   || '').trim();
-        const totalHits  = parseInt(row[hitsCol])  || 0;
-        const paidWords  = parseFloat(String(row[discountCol] || '0')) || 0;
-        const acc        = matchAccount(accounts, accountVal);
+        if (!accountVal) return null;
+
+        const taskName  = webappCol >= 0 ? String(row[webappCol]  || '').trim() : '';
+        const totalHits = hitsCol   >= 0 ? parseInt(row[hitsCol]) || 0 : 0;
+
+        // discount peut être un nombre ou une chaîne
+        const discRaw  = row[discountCol];
+        const paidWords = parseFloat(String(discRaw ?? '0').replace(/[,%]/g, '')) || 0;
+
+        // % to pay : Excel peut envoyer 0, 1, 0.7 (format %) ou "0%", "100%", "70%"
+        let pctVal = 1;
+        if (pctCol >= 0) {
+          const raw = row[pctCol];
+          if (raw !== undefined && raw !== '') {
+            const num = parseFloat(String(raw).replace('%', ''));
+            pctVal = isNaN(num) ? 1 : (num > 1 ? num / 100 : num);
+          }
+        }
+
+        // Ignorer les lignes sans mots ou avec % = 0
+        if (paidWords <= 0 || pctVal === 0) return null;
+
+        const acc = matchAccount(accounts, accountVal);
         return { accountVal, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc };
       })
-      .filter(r => r.accountVal);
+      .filter(Boolean);
   }
 
   // ── Format standard ──
