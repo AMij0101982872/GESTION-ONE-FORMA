@@ -15,22 +15,37 @@ const defaultState = {
 /* ── field mappers DB ↔ App ── */
 const toApp = (row) => {
   if (!row) return row;
-  const { translator_id, account_id, created_at, ...rest } = row;
+  const { translator_id, account_id, created_at, task_name, total_hits, paid_words, time_spent, qa_score, price_per_1k, total_price, ...rest } = row;
   return {
     ...rest,
     ...(translator_id !== undefined && { translatorId: translator_id }),
     ...(account_id    !== undefined && { accountId:    account_id    }),
     ...(created_at    !== undefined && { createdAt:    created_at    }),
+    ...(task_name     !== undefined && { taskName:     task_name     }),
+    ...(total_hits    !== undefined && { totalHits:    total_hits    }),
+    ...(paid_words    !== undefined && { paidWords:    paid_words    }),
+    ...(time_spent    !== undefined && { timeSpent:    time_spent    }),
+    ...(qa_score      !== undefined && { qaScore:      qa_score      }),
+    ...(price_per_1k  !== undefined && { pricePer1k:   price_per_1k  }),
+    ...(total_price   !== undefined && { totalPrice:   total_price   }),
   };
 };
 
 const toDB = (obj) => {
-  const { translatorId, accountId, createdAt, ...rest } = obj;
+  const { translatorId, accountId, createdAt, taskName, totalHits, paidWords, timeSpent, qaScore, pricePer1k, totalPrice, date, ...rest } = obj;
   return {
     ...rest,
     ...(translatorId !== undefined && { translator_id: translatorId ?? null }),
     ...(accountId    !== undefined && { account_id:    accountId    ?? null }),
     ...(createdAt    !== undefined && { created_at:    createdAt            }),
+    ...(taskName     !== undefined && { task_name:     taskName             }),
+    ...(totalHits    !== undefined && { total_hits:    totalHits            }),
+    ...(paidWords    !== undefined && { paid_words:    paidWords            }),
+    ...(timeSpent    !== undefined && { time_spent:    timeSpent            }),
+    ...(qaScore      !== undefined && { qa_score:      qaScore              }),
+    ...(pricePer1k   !== undefined && { price_per_1k:  pricePer1k           }),
+    ...(totalPrice   !== undefined && { total_price:   totalPrice           }),
+    // date ignoré — on utilise period
   };
 };
 
