@@ -51,22 +51,28 @@ function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
     const price1kCol    = header.findIndex(h => /price.*1|per.*1/i.test(h));
     const totalPriceCol = header.findIndex(h => /total.price|total.*usd/i.test(h));
 
+    let lastTaskName = '';
     return matrix.slice(headerIdx + 1)
-      .filter(row => {
-        const t = String(row[taskCol] || '').trim();
-        return t && !/^total/i.test(t);
-      })
       .map(row => {
-        const taskName  = String(row[taskCol] || '').trim();
-        const totalHits = parseInt(row[hitsColA]) || 0;
-        const paidWords = paidWordsCol >= 0 ? num(row[paidWordsCol]) : (totalWordsCol >= 0 ? num(row[totalWordsCol]) : 0);
-        const timeSpent = timeCol       >= 0 ? num(row[timeCol])       : 0;
-        const qaRaw     = qaCol         >= 0 ? num(row[qaCol])         : 100;
-        const qaScore   = qaRaw > 1 ? qaRaw / 100 : qaRaw;
-        const pricePer1k = price1kCol   >= 0 ? num(row[price1kCol])   : 10;
+        const rawTask = String(row[taskCol] || '').trim();
+        // Propager le nom de tâche si cellule fusionnée (vide)
+        if (rawTask) {
+          if (/^total/i.test(rawTask)) return null; // ignorer lignes "Total..."
+          lastTaskName = rawTask;
+        }
+        if (!lastTaskName) return null;
+
+        const taskName   = lastTaskName;
+        const totalHits  = parseInt(row[hitsColA]) || 0;
+        const paidWords  = paidWordsCol >= 0 ? num(row[paidWordsCol]) : (totalWordsCol >= 0 ? num(row[totalWordsCol]) : 0);
+        const timeSpent  = timeCol      >= 0 ? num(row[timeCol])      : 0;
+        const qaRaw      = qaCol        >= 0 ? num(row[qaCol])        : 100;
+        const qaScore    = qaRaw > 1 ? qaRaw / 100 : qaRaw;
+        const pricePer1k = price1kCol   >= 0 ? num(row[price1kCol])  : 10;
         const totalPrice = totalPriceCol >= 0 ? num(row[totalPriceCol]) : 0;
         return { accountVal: fixedAccount.username || fixedAccount.email, taskName, totalHits, timeSpent, qaScore, paidWords, pricePer1k, totalPrice, acc: fixedAccount };
-      });
+      })
+      .filter(Boolean);
   }
 
   // ── Format OneForma (SOCIETE 2) : Username / Webapp / Discount ──
