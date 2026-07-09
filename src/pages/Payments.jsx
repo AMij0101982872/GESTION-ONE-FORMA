@@ -587,7 +587,7 @@ export default function Payments({ payments, accounts, translators, companies, o
       {confirmId && (
         <ConfirmModal
           message="Supprimer cette ligne de paiement ?"
-          onConfirm={() => { onDelete(confirmId); toast('Supprimé'); setConfirmId(null); }}
+          onConfirm={async () => { await onDelete(confirmId); setConfirmId(null); }}
           onCancel={() => setConfirmId(null)}
         />
       )}

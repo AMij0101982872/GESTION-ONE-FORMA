@@ -165,6 +165,7 @@ export function useStore() {
     const { error } = await supabase.from('payments').delete().eq('id', id);
     if (error) { err('deletePayment', error); return; }
     setState(s => ({ ...s, payments: s.payments.filter(p => p.id !== id) }));
+    toast('Paiement supprimé ✓');
   };
 
   /* ── companies ── */
