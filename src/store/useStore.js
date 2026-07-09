@@ -149,7 +149,7 @@ export function useStore() {
 
   /* ── payments ── */
   const addPayment = async (pay) => {
-    const appRow = { id: 'pay_' + Date.now(), paid: false, ...pay };
+    const appRow = { id: 'pay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), paid: false, ...pay };
     const { error } = await supabase.from('payments').insert(toDB(appRow));
     if (error) { err('addPayment', error); return; }
     setState(s => ({ ...s, payments: [...s.payments, appRow] }));
