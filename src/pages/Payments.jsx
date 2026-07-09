@@ -96,10 +96,11 @@ function rowsFromMatrix(matrix, accounts) {
     .filter(r => r.accountVal && r.taskName);
 }
 
-export default function Payments({ payments, accounts, translators, onAdd, onMarkPaid, onDelete, rate, deduction, onSetRate, onSetDeduction }) {
+export default function Payments({ payments, accounts, translators, companies, onAdd, onMarkPaid, onDelete, rate, deduction, onSetRate, onSetDeduction }) {
   const [form, setForm]           = useState(emptyForm);
   const [preview, setPreview]     = useState(null);
   const [importPeriod, setImportPeriod] = useState(currentPeriod());
+  const [importCompany, setImportCompany] = useState('');
   const [rateInput, setRateInput]           = useState(String(rate));
   const [deductionInput, setDeductionInput] = useState(String(deduction));
   const [openPeriods, setOpenPeriods] = useState({});
@@ -134,7 +135,10 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
       console.log('=== DEBUG EXCEL ===');
       console.log('Lignes brutes :', matrix.length);
       console.log('10 premières lignes :', matrix.slice(0, 10));
-      const rows = rowsFromMatrix(matrix, accounts);
+      const scopedAccounts = importCompany
+        ? accounts.filter(a => a.company === importCompany)
+        : accounts;
+      const rows = rowsFromMatrix(matrix, scopedAccounts);
       console.log('Lignes parsées :', rows.length);
       if (!rows.length) { toast(`Aucune ligne trouvée (${matrix.length} lignes brutes)`); return; }
       setRawCount(matrix.length);
@@ -255,7 +259,22 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
 
         {!preview ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 4 }}>
+                  Société
+                </label>
+                <select
+                  value={importCompany}
+                  onChange={e => setImportCompany(e.target.value)}
+                  style={{ padding: '6px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, minWidth: 140 }}
+                >
+                  <option value=''>Toutes</option>
+                  {(companies || []).map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 4 }}>
                   Mois concerné
@@ -268,18 +287,21 @@ export default function Payments({ payments, accounts, translators, onAdd, onMar
               </div>
               <div style={{ alignSelf: 'flex-end' }}>
                 <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFile} />
-                <button className="btn primary" onClick={() => fileRef.current.click()}>
+                <button
+                  className="btn primary"
+                  onClick={() => { if (!importCompany) { toast('Sélectionne une société d\'abord'); return; } fileRef.current.click(); }}
+                >
                   <Upload size={14} /> Choisir le fichier Excel
                 </button>
               </div>
-              {importPeriod && (
+              {importCompany && importPeriod && (
                 <div style={{ alignSelf: 'flex-end', fontSize: 12, color: '#2980b9', fontWeight: 600 }}>
-                  → {periodLabel(importPeriod)}
+                  {importCompany} · {periodLabel(importPeriod)}
                 </div>
               )}
             </div>
             <p style={{ fontSize: 11, color: '#888' }}>
-              Le rapport sera associé au mois sélectionné. La correspondance se fait via le <strong>username</strong> enregistré dans les comptes.
+              Sélectionne la société dont tu importes le fichier — seuls ses comptes seront utilisés pour la correspondance.
             </p>
           </>
         ) : (
