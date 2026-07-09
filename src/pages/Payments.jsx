@@ -25,78 +25,97 @@ function matchAccount(accounts, val) {
 }
 
 function num(val) {
-  return parseFloat(String(val ?? '0').replace(/[$, ]/g, '').replace(',', '.')) || 0;
+  if (typeof val === 'number') return val;
+  return parseFloat(String(val ?? '0').replace(/[$\s]/g, '').replace(',', '.')) || 0;
+}
+
+function findHeaderIdx(matrix, testFn) {
+  const idx = matrix.findIndex(row => testFn(row.map(c => String(c || '').trim().toLowerCase())));
+  return idx === -1 ? 0 : idx;
 }
 
 function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
   if (!matrix.length) return [];
 
-  let headerIdx = matrix.findIndex(row =>
-    row.some(c => /user|webapp|account|translator|task|hit/i.test(String(c).trim()))
-  );
-  if (headerIdx === -1) headerIdx = 0;
-  const header = matrix[headerIdx].map(c => String(c || '').trim().toLowerCase());
+  // ── Format SOCIETE 1 : colonnes Task + Hits détectées ET compte pré-sélectionné ──
+  const s1Idx = matrix.findIndex(row => {
+    const cells = row.map(c => String(c || '').trim().toLowerCase());
+    return cells.some(c => /^task/i.test(c)) && cells.some(c => /hit/i.test(c));
+  });
 
-  const usernameCol = header.findIndex(h => /user/i.test(h));
-  const discountCol = header.findIndex(h => /discount/i.test(h));
-  const taskCol     = header.findIndex(h => /task/i.test(h));
-  const hitsColA    = header.findIndex(h => /^total.hit|^hit/i.test(h));
+  if (s1Idx !== -1 && fixedAccount) {
+    const header       = matrix[s1Idx].map(c => String(c || '').trim().toLowerCase());
+    const taskCol      = header.findIndex(h => /^task/i.test(h));
+    const hitsCol      = header.findIndex(h => /hit/i.test(h));
+    const paidWCol     = header.findIndex(h => /paid.word/i.test(h));
+    const totalWCol    = header.findIndex(h => /total.word/i.test(h));
+    const timeCol      = header.findIndex(h => /time/i.test(h));
+    const qaCol        = header.findIndex(h => /qa|score/i.test(h));
+    const price1kCol   = header.findIndex(h => /price.*1|per.*1/i.test(h));
+    const totalPriceCol= header.findIndex(h => /total.price|total.*usd/i.test(h));
 
-  // ── Format SOCIETE 1 : Task Name / Total Hits / Total Words / Time / QA / Paid Words / Price ──
-  if (taskCol !== -1 && hitsColA !== -1 && fixedAccount) {
-    const paidWordsCol  = header.findIndex(h => /paid.word/i.test(h));
-    const totalWordsCol = header.findIndex(h => /total.word/i.test(h));
-    const timeCol       = header.findIndex(h => /time/i.test(h));
-    const qaCol         = header.findIndex(h => /qa|score/i.test(h));
-    const price1kCol    = header.findIndex(h => /price.*1|per.*1/i.test(h));
-    const totalPriceCol = header.findIndex(h => /total.price|total.*usd/i.test(h));
+    console.log('Format S1 — headerIdx:', s1Idx, 'cols:', { taskCol, hitsCol, paidWCol, timeCol, qaCol, price1kCol, totalPriceCol });
 
-    let lastTaskName = '';
-    return matrix.slice(headerIdx + 1)
-      .map(row => {
-        const rawTask = String(row[taskCol] || '').trim();
-        // Propager le nom de tâche si cellule fusionnée (vide)
-        if (rawTask) {
-          if (/^total/i.test(rawTask)) return null; // ignorer lignes "Total..."
-          lastTaskName = rawTask;
-        }
-        if (!lastTaskName) return null;
+    let lastTask = '';
+    const results = [];
+    matrix.slice(s1Idx + 1).forEach((row, i) => {
+      const rawTask = String(row[taskCol] ?? '').trim();
+      if (rawTask) {
+        if (/^total/i.test(rawTask)) return; // ligne pied de tableau
+        lastTask = rawTask;
+      }
+      if (!lastTask) return;
+      const paidWords  = paidWCol  >= 0 ? num(row[paidWCol])   : (totalWCol >= 0 ? num(row[totalWCol]) : 0);
+      const totalPrice = totalPriceCol >= 0 ? num(row[totalPriceCol]) : 0;
+      // ignorer lignes entièrement vides (séparateurs)
+      const totalHits = hitsCol >= 0 ? (parseInt(row[hitsCol]) || 0) : 0;
+      if (!totalHits && !paidWords && !totalPrice && !rawTask) return;
 
-        const taskName   = lastTaskName;
-        const totalHits  = parseInt(row[hitsColA]) || 0;
-        const paidWords  = paidWordsCol >= 0 ? num(row[paidWordsCol]) : (totalWordsCol >= 0 ? num(row[totalWordsCol]) : 0);
-        const timeSpent  = timeCol      >= 0 ? num(row[timeCol])      : 0;
-        const qaRaw      = qaCol        >= 0 ? num(row[qaCol])        : 100;
-        const qaScore    = qaRaw > 1 ? qaRaw / 100 : qaRaw;
-        const pricePer1k = price1kCol   >= 0 ? num(row[price1kCol])  : 10;
-        const totalPrice = totalPriceCol >= 0 ? num(row[totalPriceCol]) : 0;
-        return { accountVal: fixedAccount.username || fixedAccount.email, taskName, totalHits, timeSpent, qaScore, paidWords, pricePer1k, totalPrice, acc: fixedAccount };
-      })
-      .filter(Boolean);
+      const timeSpent  = timeCol    >= 0 ? num(row[timeCol])    : 0;
+      const qaRaw      = qaCol      >= 0 ? num(row[qaCol])      : 100;
+      const qaScore    = qaRaw > 1 ? qaRaw / 100 : qaRaw;
+      const pricePer1k = price1kCol >= 0 ? num(row[price1kCol]) : 10;
+      console.log(`  S1 ligne ${s1Idx + 1 + i}: task="${lastTask}" hits=${totalHits} paidW=${paidWords} price=${totalPrice}`);
+      results.push({ accountVal: fixedAccount.username || fixedAccount.email, taskName: lastTask, totalHits, timeSpent, qaScore, paidWords, pricePer1k, totalPrice, acc: fixedAccount });
+    });
+    return results;
   }
 
-  // ── Format OneForma (SOCIETE 2) : Username / Webapp / Discount ──
-  if (usernameCol !== -1 && discountCol !== -1) {
+  // ── Format OneForma (SOCIETE 2) : colonnes Username + Discount ──
+  const s2Idx = matrix.findIndex(row => {
+    const cells = row.map(c => String(c || '').trim().toLowerCase());
+    return cells.some(c => /user/i.test(c)) && cells.some(c => /discount/i.test(c));
+  });
+
+  if (s2Idx !== -1) {
+    const header    = matrix[s2Idx].map(c => String(c || '').trim().toLowerCase());
+    const userCol   = header.findIndex(h => /user/i.test(h));
+    const discCol   = header.findIndex(h => /discount/i.test(h));
     const webappCol = header.findIndex(h => /webapp|app/i.test(h));
     const hitsCol   = header.findIndex(h => /hit|submit/i.test(h));
-    let lastUsername = '';
+
+    console.log('Format S2 — headerIdx:', s2Idx, 'cols:', { userCol, discCol, webappCol, hitsCol });
+
+    let lastUser = '';
     const results = [];
-    matrix.slice(headerIdx + 1).forEach(row => {
-      const rawUsername = String(row[usernameCol] || '').trim();
-      if (rawUsername) lastUsername = rawUsername;
-      if (!lastUsername) return;
+    matrix.slice(s2Idx + 1).forEach(row => {
+      const rawUser = String(row[userCol] || '').trim();
+      if (rawUser) lastUser = rawUser;
+      if (!lastUser) return;
       const taskName  = webappCol >= 0 ? String(row[webappCol] || '').trim() : '';
-      const paidWords = num(row[discountCol]);
+      const paidWords = num(row[discCol]);
       const totalHits = hitsCol >= 0 ? parseInt(row[hitsCol]) || 0 : 0;
-      const acc = matchAccount(accounts, lastUsername);
-      results.push({ accountVal: lastUsername, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc });
+      const acc = matchAccount(accounts, lastUser);
+      results.push({ accountVal: lastUser, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc });
     });
     return results;
   }
 
   // ── Format standard ──
+  const hIdx = findHeaderIdx(matrix, cells => cells.some(c => /user|webapp|account|translator/i.test(c)));
+  const header = matrix[hIdx].map(c => String(c || '').trim().toLowerCase());
   const off = /translator/.test(header[0]) ? 1 : 0;
-  return matrix.slice(headerIdx + 1)
+  return matrix.slice(hIdx + 1)
     .filter(row => { const f = String(row[off] || '').trim(); return f && !/^total/i.test(f); })
     .map(row => {
       const c = (i) => String(row[off + i] ?? '').trim();
