@@ -24,58 +24,71 @@ function matchAccount(accounts, val) {
   );
 }
 
-function rowsFromMatrix(matrix, accounts) {
+function num(val) {
+  return parseFloat(String(val ?? '0').replace(/[$, ]/g, '').replace(',', '.')) || 0;
+}
+
+function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
   if (!matrix.length) return [];
 
   let headerIdx = matrix.findIndex(row =>
-    row.some(c => /user|webapp|account|translator/i.test(String(c).trim()))
+    row.some(c => /user|webapp|account|translator|task|hit/i.test(String(c).trim()))
   );
   if (headerIdx === -1) headerIdx = 0;
   const header = matrix[headerIdx].map(c => String(c || '').trim().toLowerCase());
 
-  console.log('Header détecté à la ligne', headerIdx, ':', header);
-
   const usernameCol = header.findIndex(h => /user/i.test(h));
   const discountCol = header.findIndex(h => /discount/i.test(h));
+  const taskCol     = header.findIndex(h => /task/i.test(h));
+  const hitsColA    = header.findIndex(h => /^total.hit|^hit/i.test(h));
 
-  console.log('usernameCol:', usernameCol, ' discountCol:', discountCol);
+  // ── Format SOCIETE 1 : Task Name / Total Hits / Total Words / Time / QA / Paid Words / Price ──
+  if (taskCol !== -1 && hitsColA !== -1 && fixedAccount) {
+    const paidWordsCol  = header.findIndex(h => /paid.word/i.test(h));
+    const totalWordsCol = header.findIndex(h => /total.word/i.test(h));
+    const timeCol       = header.findIndex(h => /time/i.test(h));
+    const qaCol         = header.findIndex(h => /qa|score/i.test(h));
+    const price1kCol    = header.findIndex(h => /price.*1|per.*1/i.test(h));
+    const totalPriceCol = header.findIndex(h => /total.price|total.*usd/i.test(h));
 
+    return matrix.slice(headerIdx + 1)
+      .filter(row => {
+        const t = String(row[taskCol] || '').trim();
+        return t && !/^total/i.test(t);
+      })
+      .map(row => {
+        const taskName  = String(row[taskCol] || '').trim();
+        const totalHits = parseInt(row[hitsColA]) || 0;
+        const paidWords = paidWordsCol >= 0 ? num(row[paidWordsCol]) : (totalWordsCol >= 0 ? num(row[totalWordsCol]) : 0);
+        const timeSpent = timeCol       >= 0 ? num(row[timeCol])       : 0;
+        const qaRaw     = qaCol         >= 0 ? num(row[qaCol])         : 100;
+        const qaScore   = qaRaw > 1 ? qaRaw / 100 : qaRaw;
+        const pricePer1k = price1kCol   >= 0 ? num(row[price1kCol])   : 10;
+        const totalPrice = totalPriceCol >= 0 ? num(row[totalPriceCol]) : 0;
+        return { accountVal: fixedAccount.username || fixedAccount.email, taskName, totalHits, timeSpent, qaScore, paidWords, pricePer1k, totalPrice, acc: fixedAccount };
+      });
+  }
+
+  // ── Format OneForma (SOCIETE 2) : Username / Webapp / Discount ──
   if (usernameCol !== -1 && discountCol !== -1) {
     const webappCol = header.findIndex(h => /webapp|app/i.test(h));
     const hitsCol   = header.findIndex(h => /hit|submit/i.test(h));
-
-    console.log('Format OneForma — webappCol:', webappCol, ' hitsCol:', hitsCol);
-
     let lastUsername = '';
-    const dataRows = matrix.slice(headerIdx + 1);
-    console.log('Lignes de données :', dataRows.length);
-
     const results = [];
-    dataRows.forEach((row, i) => {
+    matrix.slice(headerIdx + 1).forEach(row => {
       const rawUsername = String(row[usernameCol] || '').trim();
       if (rawUsername) lastUsername = rawUsername;
-      const accountVal = lastUsername;
-
-      const taskName  = webappCol >= 0 ? String(row[webappCol]  || '').trim() : '';
-      const discRaw   = row[discountCol];
-      const paidWords = parseFloat(String(discRaw ?? '0').replace(/[,%]/g, '')) || 0;
-
-      console.log(`  Ligne ${headerIdx + 1 + i}: username="${rawUsername}" → "${accountVal}" | task="${taskName}" | discount="${discRaw}" → ${paidWords}`);
-
-      if (!accountVal) { console.log('    → IGNORÉE (pas de username)'); return; }
-
+      if (!lastUsername) return;
+      const taskName  = webappCol >= 0 ? String(row[webappCol] || '').trim() : '';
+      const paidWords = num(row[discountCol]);
       const totalHits = hitsCol >= 0 ? parseInt(row[hitsCol]) || 0 : 0;
-      const acc = matchAccount(accounts, accountVal);
-      if (!acc) console.log(`    → username "${accountVal}" non trouvé dans les comptes`);
-
-      results.push({ accountVal, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc });
+      const acc = matchAccount(accounts, lastUsername);
+      results.push({ accountVal: lastUsername, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k: 10, totalPrice: 0, acc });
     });
-
     return results;
   }
 
   // ── Format standard ──
-  console.log('Format standard utilisé');
   const off = /translator/.test(header[0]) ? 1 : 0;
   return matrix.slice(headerIdx + 1)
     .filter(row => { const f = String(row[off] || '').trim(); return f && !/^total/i.test(f); })
@@ -83,13 +96,13 @@ function rowsFromMatrix(matrix, accounts) {
       const c = (i) => String(row[off + i] ?? '').trim();
       const accountVal = c(0);
       const taskName   = c(1);
-      const totalHits  = parseInt(c(2))                          || 0;
-      const timeSpent  = parseFloat(c(4))                        || 0;
-      const qaRaw      = parseFloat(c(5))                        || 100;
+      const totalHits  = parseInt(c(2))  || 0;
+      const timeSpent  = num(c(4));
+      const qaRaw      = num(c(5)) || 100;
       const qaScore    = qaRaw > 1 ? qaRaw / 100 : qaRaw;
-      const paidWords  = parseInt(c(6)) || parseInt(c(3))        || 0;
-      const pricePer1k = parseFloat(c(8).replace(/[$,]/g, ''))  || 10;
-      const totalPrice = parseFloat(c(9).replace(/[$,]/g, ''))  || 0;
+      const paidWords  = parseInt(c(6)) || parseInt(c(3)) || 0;
+      const pricePer1k = num(c(8)) || 10;
+      const totalPrice = num(c(9));
       const acc        = matchAccount(accounts, accountVal);
       return { accountVal, taskName, totalHits, timeSpent, qaScore, paidWords, pricePer1k, totalPrice, acc };
     })
@@ -101,6 +114,7 @@ export default function Payments({ payments, accounts, translators, companies, o
   const [preview, setPreview]     = useState(null);
   const [importPeriod, setImportPeriod] = useState(currentPeriod());
   const [importCompany, setImportCompany] = useState('');
+  const [importAccountId, setImportAccountId] = useState('');
   const [rateInput, setRateInput]           = useState(String(rate));
   const [deductionInput, setDeductionInput] = useState(String(deduction));
   const [openPeriods, setOpenPeriods] = useState({});
@@ -138,7 +152,10 @@ export default function Payments({ payments, accounts, translators, companies, o
       const scopedAccounts = importCompany
         ? accounts.filter(a => a.company === importCompany)
         : accounts;
-      const rows = rowsFromMatrix(matrix, scopedAccounts);
+      const fixedAccount = importAccountId
+        ? accounts.find(a => a.id === importAccountId) || null
+        : null;
+      const rows = rowsFromMatrix(matrix, scopedAccounts, fixedAccount);
       console.log('Lignes parsées :', rows.length);
       if (!rows.length) { toast(`Aucune ligne trouvée (${matrix.length} lignes brutes)`); return; }
       setRawCount(matrix.length);
@@ -275,6 +292,28 @@ export default function Payments({ payments, accounts, translators, companies, o
                   ))}
                 </select>
               </div>
+              {importCompany && (
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 4 }}>
+                    Compte (si 1 seul fichier par compte)
+                  </label>
+                  <select
+                    value={importAccountId}
+                    onChange={e => setImportAccountId(e.target.value)}
+                    style={{ padding: '6px 10px', border: '1px solid #ddd', borderRadius: 6, fontSize: 13, minWidth: 200 }}
+                  >
+                    <option value=''>Détection auto (multi-comptes)</option>
+                    {accounts
+                      .filter(a => a.company === importCompany)
+                      .sort((a, b) => (a.username || a.email || '').localeCompare(b.username || b.email || ''))
+                      .map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.username || a.email}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 700, color: '#666', textTransform: 'uppercase', letterSpacing: '.4px', display: 'block', marginBottom: 4 }}>
                   Mois concerné
