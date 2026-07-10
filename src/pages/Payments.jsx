@@ -81,24 +81,68 @@ function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
     return results;
   }
 
-  // ── Format OneForma (SOCIETE 2) : colonnes Username + Discount ──
+  // ── Format SOCIETE 2 (OneForma) : Email | Webapp | Username | Contractor ID | % to pay | WC after discount | Price/1k | Total Price ──
   const s2Idx = matrix.findIndex(row => {
+    const cells = row.map(c => String(c || '').trim().toLowerCase());
+    return cells.some(c => c === 'email') && cells.some(c => /wc.+discount|wc after/i.test(c));
+  });
+
+  if (s2Idx !== -1) {
+    const header        = matrix[s2Idx].map(c => String(c || '').trim().toLowerCase());
+    const emailCol      = header.findIndex(h => h === 'email');
+    const webappCol     = header.findIndex(h => /webapp/i.test(h));
+    const userCol       = header.findIndex(h => /^username$/i.test(h));
+    const paidWCol      = header.findIndex(h => /wc.+discount|wc after/i.test(h));
+    const price1kCol    = header.findIndex(h => /price.*1000|per.*1000/i.test(h));
+    const totalPriceCol = header.findIndex(h => /^total price$/i.test(h));
+
+    console.log('Format S2 — headerIdx:', s2Idx, 'cols:', { emailCol, webappCol, userCol, paidWCol, price1kCol, totalPriceCol });
+
+    const results = [];
+    matrix.slice(s2Idx + 1).forEach((row, i) => {
+      const email    = String(row[emailCol] || '').trim();
+      const username = userCol >= 0 ? String(row[userCol] || '').trim() : '';
+      const taskName = webappCol >= 0 ? String(row[webappCol] || '').trim() : '';
+
+      // Arrêter à la ligne TOTAL ou ligne vide
+      if (!email || /^total/i.test(email)) return;
+
+      const paidWords  = paidWCol      >= 0 ? num(row[paidWCol])      : 0;
+      const pricePer1k = price1kCol    >= 0 ? num(row[price1kCol])    : 10;
+      const totalPrice = totalPriceCol >= 0 ? num(row[totalPriceCol]) : parseFloat((paidWords / 1000 * pricePer1k).toFixed(5));
+
+      // Ignorer lignes à 0 mots ET 0 total
+      if (!paidWords && !totalPrice) return;
+
+      const accountVal = username || email;
+      // Chercher par username d'abord, puis par email
+      let acc = username ? matchAccount(accounts, username) : null;
+      if (!acc) acc = accounts.find(a => a.email && a.email.toLowerCase().trim() === email.toLowerCase().trim());
+
+      console.log(`  S2 ligne ${s2Idx + 1 + i}: email="${email}" user="${username}" task="${taskName}" paidW=${paidWords} total=${totalPrice}`);
+      results.push({ accountVal, taskName, totalHits: 0, timeSpent: 0, qaScore: 1, paidWords, pricePer1k, totalPrice, acc });
+    });
+    return results;
+  }
+
+  // ── Format OneForma (legacy) : colonnes Username + Discount ──
+  const s2LegacyIdx = matrix.findIndex(row => {
     const cells = row.map(c => String(c || '').trim().toLowerCase());
     return cells.some(c => /user/i.test(c)) && cells.some(c => /discount/i.test(c));
   });
 
-  if (s2Idx !== -1) {
-    const header    = matrix[s2Idx].map(c => String(c || '').trim().toLowerCase());
+  if (s2LegacyIdx !== -1) {
+    const header    = matrix[s2LegacyIdx].map(c => String(c || '').trim().toLowerCase());
     const userCol   = header.findIndex(h => /user/i.test(h));
     const discCol   = header.findIndex(h => /discount/i.test(h));
     const webappCol = header.findIndex(h => /webapp|app/i.test(h));
     const hitsCol   = header.findIndex(h => /hit|submit/i.test(h));
 
-    console.log('Format S2 — headerIdx:', s2Idx, 'cols:', { userCol, discCol, webappCol, hitsCol });
+    console.log('Format S2-legacy — headerIdx:', s2LegacyIdx, 'cols:', { userCol, discCol, webappCol, hitsCol });
 
     let lastUser = '';
     const results = [];
-    matrix.slice(s2Idx + 1).forEach(row => {
+    matrix.slice(s2LegacyIdx + 1).forEach(row => {
       const rawUser = String(row[userCol] || '').trim();
       if (rawUser) lastUser = rawUser;
       if (!lastUser) return;
