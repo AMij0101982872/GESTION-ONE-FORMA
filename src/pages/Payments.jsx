@@ -273,18 +273,28 @@ export default function Payments({ payments, accounts, translators, companies, o
     toast('Ligne ajoutée ✓');
   };
 
-  // Grouper par période puis par traducteur
+  // Grouper par période → société → traducteur
   const byPeriod = {};
   payments.forEach(p => {
-    const period = p.period || p.date?.slice(0, 7) || 'inconnu';
-    if (!byPeriod[period]) byPeriod[period] = {};
-    const trKey = p.translatorId || '__none__';
-    if (!byPeriod[period][trKey]) byPeriod[period][trKey] = { paid: 0, due: 0, rows: [] };
-    if (p.paid) byPeriod[period][trKey].paid += p.totalPrice;
-    else        byPeriod[period][trKey].due  += p.totalPrice;
-    byPeriod[period][trKey].rows.push(p);
+    const period  = p.period || p.date?.slice(0, 7) || 'inconnu';
+    const acc     = accounts.find(a => a.id === p.accountId);
+    const company = acc?.company || 'Autre';
+    const trKey   = p.translatorId || '__none__';
+    if (!byPeriod[period])                 byPeriod[period] = {};
+    if (!byPeriod[period][company])        byPeriod[period][company] = {};
+    if (!byPeriod[period][company][trKey]) byPeriod[period][company][trKey] = { paid: 0, due: 0, rows: [] };
+    if (p.paid) byPeriod[period][company][trKey].paid += p.totalPrice;
+    else        byPeriod[period][company][trKey].due  += p.totalPrice;
+    byPeriod[period][company][trKey].rows.push(p);
   });
   const sortedPeriods = Object.keys(byPeriod).sort((a, b) => b.localeCompare(a));
+
+  const CO_STYLE = {
+    'SOCIETE 1': { background: '#eef2ff', color: '#4338ca', border: '1px solid #a5b4fc' },
+    'SOCIETE 2': { background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac' },
+    'SOCIETE 3': { background: '#fff7ed', color: '#c2410c', border: '1px solid #fdba74' },
+  };
+  const coStyle = (name) => CO_STYLE[name] || { background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' };
 
   return (
     <div>
@@ -519,27 +529,13 @@ export default function Payments({ payments, accounts, translators, companies, o
 
       {sortedPeriods.map(period => {
         const periodData = byPeriod[period];
-        const pTotal = Object.values(periodData).reduce((s, d) => s + d.paid + d.due, 0);
-        const pDue   = Object.values(periodData).reduce((s, d) => s + d.due, 0);
-        const pPaid  = Object.values(periodData).reduce((s, d) => s + d.paid, 0);
+        const allTrDataFlat = Object.values(periodData).flatMap(co => Object.values(co));
+        const pTotal = allTrDataFlat.reduce((s, d) => s + d.paid + d.due, 0);
+        const pDue   = allTrDataFlat.reduce((s, d) => s + d.due,  0);
+        const pPaid  = allTrDataFlat.reduce((s, d) => s + d.paid, 0);
         const isOpen = openPeriods[period] !== false && (period === cp || openPeriods[period]);
 
-        // Totaux par société pour ce mois
-        const companyTotals = {};
-        Object.values(periodData).forEach(d => {
-          d.rows.forEach(p => {
-            const acc = accounts.find(a => a.id === p.accountId);
-            const co  = acc?.company || 'Autre';
-            if (!companyTotals[co]) companyTotals[co] = 0;
-            companyTotals[co] += p.totalPrice;
-          });
-        });
-        const CO_STYLE = {
-          'SOCIETE 1': { background: '#eef2ff', color: '#4338ca', border: '1px solid #a5b4fc' },
-          'SOCIETE 2': { background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac' },
-          'SOCIETE 3': { background: '#fff7ed', color: '#c2410c', border: '1px solid #fdba74' },
-        };
-        const coStyle = (name) => CO_STYLE[name] || { background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' };
+        const lineCount = allTrDataFlat.reduce((s, d) => s + d.rows.length, 0);
 
         return (
           <div key={period} className="card">
@@ -552,11 +548,14 @@ export default function Payments({ payments, accounts, translators, companies, o
                 {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <strong style={{ fontSize: 14 }}>{periodLabel(period)}</strong>
                 {period === cp && <span className="badge assigned" style={{ fontSize: 10 }}>Mois en cours</span>}
-                {Object.entries(companyTotals).map(([co, total]) => (
-                  <span key={co} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, ...coStyle(co) }}>
-                    {co} · {total.toFixed(2)} $
-                  </span>
-                ))}
+                {Object.entries(periodData).map(([co, coData]) => {
+                  const coTotal = Object.values(coData).reduce((s, d) => s + d.paid + d.due, 0);
+                  return (
+                    <span key={co} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, ...coStyle(co) }}>
+                      {co} · {coTotal.toFixed(2)} $
+                    </span>
+                  );
+                })}
               </div>
               <div style={{ display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' }}>
                 <span className="text-green fw-bold">{pPaid.toFixed(2)} $ payé</span>
@@ -566,7 +565,7 @@ export default function Payments({ payments, accounts, translators, companies, o
                     <span style={{ color: 'var(--text2)', fontSize: 11 }}>{pDue.toFixed(2)} $ dû</span>
                   </span>
                 )}
-                <span style={{ color: '#aaa', fontSize: 11 }}>{Object.values(periodData).reduce((s, d) => s + d.rows.length, 0)} ligne(s)</span>
+                <span style={{ color: '#aaa', fontSize: 11 }}>{lineCount} ligne(s)</span>
                 <button
                   className="btn sm danger icon"
                   title="Supprimer tous les paiements de ce mois"
@@ -577,120 +576,133 @@ export default function Payments({ payments, accounts, translators, companies, o
               </div>
             </div>
 
-            {/* Traducteurs de cette période */}
-            {isOpen && translators.filter(t => periodData[t.id]).map(t => {
-              const d = periodData[t.id];
+            {/* Sociétés → Traducteurs */}
+            {isOpen && Object.entries(periodData).map(([company, coData]) => {
+              const coDue  = Object.values(coData).reduce((s, d) => s + d.due,  0);
+              const coPaid = Object.values(coData).reduce((s, d) => s + d.paid, 0);
               return (
-                <div key={t.id} style={{ marginBottom: '1rem' }}>
-                  <div className="card-header" style={{ background: 'var(--surface2)', padding: '8px 12px', borderRadius: 8, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <strong style={{ fontSize: 13 }}>{t.name}</strong>
-                      <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.rows.length} tâche(s)</span>
+                <div key={company} style={{ marginBottom: '1.5rem' }}>
+                  {/* En-tête société */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderRadius: 8, marginBottom: 10, ...coStyle(company) }}>
+                    <strong style={{ fontSize: 13 }}>{company}</strong>
+                    <div style={{ display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' }}>
+                      {coPaid > 0 && <span style={{ fontWeight: 700 }}>{coPaid.toFixed(2)} $ payé</span>}
+                      {coDue  > 0 && <span style={{ fontWeight: 700 }}>{fcfa(coDue, rate, deduction)} · {coDue.toFixed(2)} $ dû</span>}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {d.paid > 0 && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span className="fcfa-pill" style={{ color: 'var(--green)', background: 'var(--green-bg)', borderColor: 'var(--green-border)' }}>{fcfa(d.paid, rate, deduction)}</span>
-                            <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.paid.toFixed(2)} $ payé</span>
-                          </span>
-                        )}
-                        {d.due > 0 && (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span className="fcfa-pill">{fcfa(d.due, rate, deduction)}</span>
-                            <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.due.toFixed(2)} $ dû</span>
-                          </span>
-                        )}
+                  </div>
+
+                  {/* Traducteurs de cette société */}
+                  {translators.filter(t => coData[t.id]).map(t => {
+                    const d = coData[t.id];
+                    return (
+                      <div key={t.id} style={{ marginBottom: '1rem' }}>
+                        <div className="card-header" style={{ background: 'var(--surface2)', padding: '8px 12px', borderRadius: 8, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <strong style={{ fontSize: 13 }}>{t.name}</strong>
+                            <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.rows.length} tâche(s)</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {d.paid > 0 && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <span className="fcfa-pill" style={{ color: 'var(--green)', background: 'var(--green-bg)', borderColor: 'var(--green-border)' }}>{fcfa(d.paid, rate, deduction)}</span>
+                                  <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.paid.toFixed(2)} $ payé</span>
+                                </span>
+                              )}
+                              {d.due > 0 && (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                  <span className="fcfa-pill">{fcfa(d.due, rate, deduction)}</span>
+                                  <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.due.toFixed(2)} $ dû</span>
+                                </span>
+                              )}
+                            </div>
+                            {d.due > 0 && (
+                              <button
+                                className="btn sm green"
+                                title="Marquer tous les paiements de ce traducteur comme payés"
+                                onClick={() => { const ids = d.rows.filter(p => !p.paid).map(p => p.id); onMarkAllPaid(ids); }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
+                              >
+                                <Check size={11} /> Tout payer
+                              </button>
+                            )}
+                            <button
+                              className="btn sm"
+                              title="Générer le reçu image à envoyer au traducteur"
+                              onClick={() => setReceipt({ translator: t, rows: d.rows, period })}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
+                            >
+                              <Receipt size={11} /> Reçu image
+                            </button>
+                          </div>
+                        </div>
+                        <div className="tbl-wrap">
+                          <table className="tbl">
+                            <thead>
+                              <tr>
+                                <th>Username</th>
+                                <th>Tâche</th>
+                                <th>Hits</th>
+                                <th>Mots</th>
+                                <th>Temps</th>
+                                <th>QA</th>
+                                <th>$/1k</th>
+                                <th>Total $</th>
+                                <th>FCFA</th>
+                                <th>Statut</th>
+                                <th></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {d.rows.map(p => {
+                                const acc = accounts.find(a => a.id === p.accountId);
+                                return (
+                                  <tr key={p.id}>
+                                    <td><span className="mono">{acc?.username || acc?.accid || '—'}</span></td>
+                                    <td style={{ fontSize: 11 }}>{p.taskName}</td>
+                                    <td className="text-right">{p.totalHits}</td>
+                                    <td className="text-right">{(p.paidWords || 0).toLocaleString()}</td>
+                                    <td className="text-right">{p.timeSpent}h</td>
+                                    <td className="text-right">{((p.qaScore || 1) * 100).toFixed(0)}%</td>
+                                    <td className="text-right">
+                                      <input
+                                        type="number" step="0.01" min="0"
+                                        defaultValue={(p.pricePer1k || 10).toFixed(2)}
+                                        onBlur={e => {
+                                          const val = parseFloat(e.target.value) || 10;
+                                          const newTotal = parseFloat(((p.paidWords || 0) / 1000 * val).toFixed(5));
+                                          onUpdate(p.id, { pricePer1k: val, totalPrice: newTotal });
+                                        }}
+                                        onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                                        style={{ width: 60, textAlign: 'right', border: '1px solid transparent', borderRadius: 4, padding: '2px 4px', fontSize: 'inherit', fontFamily: 'inherit', background: 'transparent', cursor: 'text' }}
+                                        onFocus={e => e.target.style.borderColor = 'var(--blue, #2980b9)'}
+                                        onBlurCapture={e => e.target.style.borderColor = 'transparent'}
+                                      />
+                                    </td>
+                                    <td className="text-right" style={{ fontSize: 11, color: 'var(--text2)' }}>{p.totalPrice.toFixed(2)} $</td>
+                                    <td className="text-right"><span className="fcfa-pill">{fcfa(p.totalPrice, rate, deduction)}</span></td>
+                                    <td><span className={`badge ${p.paid ? 'paid' : 'unpaid'}`}>{p.paid ? 'Payé' : 'En attente'}</span></td>
+                                    <td>
+                                      <div className="btn-group">
+                                        {!p.paid && (
+                                          <button className="btn sm green" onClick={() => { onMarkPaid(p.id); toast('Marqué payé ✓'); }}>
+                                            <Check size={11} /> Payé
+                                          </button>
+                                        )}
+                                        <button className="btn sm danger icon" onClick={() => setConfirmId(p.id)}>
+                                          <Trash2 size={11} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                      {d.due > 0 && (
-                        <button
-                          className="btn sm green"
-                          title="Marquer tous les paiements de ce traducteur comme payés"
-                          onClick={() => {
-                            const ids = d.rows.filter(p => !p.paid).map(p => p.id);
-                            onMarkAllPaid(ids);
-                          }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
-                        >
-                          <Check size={11} /> Tout payer
-                        </button>
-                      )}
-                      <button
-                        className="btn sm"
-                        title="Générer le reçu image à envoyer au traducteur"
-                        onClick={() => setReceipt({ translator: t, rows: d.rows, period })}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
-                      >
-                        <Receipt size={11} /> Reçu image
-                      </button>
-                    </div>
-                  </div>
-                  <div className="tbl-wrap">
-                    <table className="tbl">
-                      <thead>
-                        <tr>
-                          <th>Username</th>
-                          <th>Tâche</th>
-                          <th>Hits</th>
-                          <th>Mots</th>
-                          <th>Temps</th>
-                          <th>QA</th>
-                          <th>$/1k</th>
-                          <th>Total $</th>
-                          <th>FCFA</th>
-                          <th>Statut</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {d.rows.map(p => {
-                          const acc = accounts.find(a => a.id === p.accountId);
-                          return (
-                            <tr key={p.id}>
-                              <td><span className="mono">{acc?.username || acc?.accid || '—'}</span></td>
-                              <td style={{ fontSize: 11 }}>{p.taskName}</td>
-                              <td className="text-right">{p.totalHits}</td>
-                              <td className="text-right">{(p.paidWords || 0).toLocaleString()}</td>
-                              <td className="text-right">{p.timeSpent}h</td>
-                              <td className="text-right">{((p.qaScore || 1) * 100).toFixed(0)}%</td>
-                              <td className="text-right">
-                                <input
-                                  type="number" step="0.01" min="0"
-                                  defaultValue={(p.pricePer1k || 10).toFixed(2)}
-                                  onBlur={e => {
-                                    const val = parseFloat(e.target.value) || 10;
-                                    const newTotal = parseFloat(((p.paidWords || 0) / 1000 * val).toFixed(5));
-                                    onUpdate(p.id, { pricePer1k: val, totalPrice: newTotal });
-                                  }}
-                                  onKeyDown={e => e.key === 'Enter' && e.target.blur()}
-                                  style={{ width: 60, textAlign: 'right', border: '1px solid transparent', borderRadius: 4, padding: '2px 4px', fontSize: 'inherit', fontFamily: 'inherit', background: 'transparent', cursor: 'text' }}
-                                  onFocus={e => e.target.style.borderColor = 'var(--blue, #2980b9)'}
-                                  onBlurCapture={e => e.target.style.borderColor = 'transparent'}
-                                />
-                              </td>
-                              <td className="text-right" style={{ fontSize: 11, color: 'var(--text2)' }}>{p.totalPrice.toFixed(2)} $</td>
-                              <td className="text-right"><span className="fcfa-pill">{fcfa(p.totalPrice, rate, deduction)}</span></td>
-                              <td><span className={`badge ${p.paid ? 'paid' : 'unpaid'}`}>{p.paid ? 'Payé' : 'En attente'}</span></td>
-                              <td>
-                                <div className="btn-group">
-                                  {!p.paid && (
-                                    <button className="btn sm green" onClick={() => { onMarkPaid(p.id); toast('Marqué payé ✓'); }}>
-                                      <Check size={11} /> Payé
-                                    </button>
-                                  )}
-                                  <button className="btn sm danger icon" onClick={() => {
-                                    setConfirmId(p.id)
-                                  }}>
-                                    <Trash2 size={11} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                    );
+                  })}
                 </div>
               );
             })}
