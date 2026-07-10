@@ -167,6 +167,14 @@ export function useStore() {
     setState(s => ({ ...s, payments: s.payments.map(p => p.id === id ? { ...p, paid: true } : p) }));
   };
 
+  const markAllPaid = async (ids) => {
+    if (!ids.length) return;
+    const { error } = await supabase.from('payments').update({ paid: true }).in('id', ids);
+    if (error) { err('markAllPaid', error); return; }
+    setState(s => ({ ...s, payments: s.payments.map(p => ids.includes(p.id) ? { ...p, paid: true } : p) }));
+    toast(`${ids.length} paiement(s) marqué(s) payé ✓`);
+  };
+
   const deletePayment = async (id) => {
     const { error } = await supabase.from('payments').delete().eq('id', id);
     if (error) { err('deletePayment', error); return; }
@@ -222,7 +230,7 @@ export function useStore() {
     ...state,
     addTranslator, updateTranslator, deleteTranslator,
     addAccount, updateAccount, deleteAccount,
-    addPayment, updatePayment, markPaid, deletePayment, deletePaymentsPeriod,
+    addPayment, updatePayment, markPaid, markAllPaid, deletePayment, deletePaymentsPeriod,
     addCompany, updateCompany, deleteCompany,
     setRate, setDeduction,
   };
