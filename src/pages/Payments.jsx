@@ -178,7 +178,7 @@ function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
     .filter(r => r.accountVal && r.taskName);
 }
 
-export default function Payments({ payments, accounts, translators, companies, onAdd, onUpdate, onMarkPaid, onDelete, onDeletePeriod, rate, deduction, onSetRate, onSetDeduction }) {
+export default function Payments({ payments, accounts, translators, companies, onAdd, onUpdate, onMarkPaid, onMarkAllPaid, onDelete, onDeletePeriod, rate, deduction, onSetRate, onSetDeduction }) {
   const [form, setForm]           = useState(emptyForm);
   const [preview, setPreview]     = useState(null);
   const [importPeriod, setImportPeriod] = useState(currentPeriod());
@@ -580,6 +580,19 @@ export default function Payments({ payments, accounts, translators, companies, o
                           </span>
                         )}
                       </div>
+                      {d.due > 0 && (
+                        <button
+                          className="btn sm green"
+                          title="Marquer tous les paiements de ce traducteur comme payés"
+                          onClick={() => {
+                            const ids = d.rows.filter(p => !p.paid).map(p => p.id);
+                            onMarkAllPaid(ids);
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
+                        >
+                          <Check size={11} /> Tout payer
+                        </button>
+                      )}
                       <button
                         className="btn sm"
                         title="Générer le reçu image à envoyer au traducteur"
