@@ -182,9 +182,14 @@ export function useStore() {
     toast('Paiement supprimé ✓');
   };
 
-  const deletePaymentsPeriod = async (period) => {
+  const deletePaymentsPeriod = async (period, company = null) => {
     const ids = state.payments
-      .filter(p => (p.period || p.date?.slice(0, 7)) === period)
+      .filter(p => {
+        if ((p.period || p.date?.slice(0, 7)) !== period) return false;
+        if (!company) return true;
+        const acc = state.accounts.find(a => a.id === p.accountId);
+        return (acc?.company || 'Autre') === company;
+      })
       .map(p => p.id);
     if (!ids.length) return;
     const { error } = await supabase.from('payments').delete().in('id', ids);
