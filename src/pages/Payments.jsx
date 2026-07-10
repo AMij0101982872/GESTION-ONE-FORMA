@@ -134,7 +134,7 @@ function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
     .filter(r => r.accountVal && r.taskName);
 }
 
-export default function Payments({ payments, accounts, translators, companies, onAdd, onMarkPaid, onDelete, rate, deduction, onSetRate, onSetDeduction }) {
+export default function Payments({ payments, accounts, translators, companies, onAdd, onUpdate, onMarkPaid, onDelete, rate, deduction, onSetRate, onSetDeduction }) {
   const [form, setForm]           = useState(emptyForm);
   const [preview, setPreview]     = useState(null);
   const [importPeriod, setImportPeriod] = useState(currentPeriod());
@@ -566,7 +566,21 @@ export default function Payments({ payments, accounts, translators, companies, o
                               <td className="text-right">{(p.paidWords || 0).toLocaleString()}</td>
                               <td className="text-right">{p.timeSpent}h</td>
                               <td className="text-right">{((p.qaScore || 1) * 100).toFixed(0)}%</td>
-                              <td className="text-right">{(p.pricePer1k || 10).toFixed(2)}</td>
+                              <td className="text-right">
+                                <input
+                                  type="number" step="0.01" min="0"
+                                  defaultValue={(p.pricePer1k || 10).toFixed(2)}
+                                  onBlur={e => {
+                                    const val = parseFloat(e.target.value) || 10;
+                                    const newTotal = parseFloat(((p.paidWords || 0) / 1000 * val).toFixed(5));
+                                    onUpdate(p.id, { pricePer1k: val, totalPrice: newTotal });
+                                  }}
+                                  onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                                  style={{ width: 60, textAlign: 'right', border: '1px solid transparent', borderRadius: 4, padding: '2px 4px', fontSize: 'inherit', fontFamily: 'inherit', background: 'transparent', cursor: 'text' }}
+                                  onFocus={e => e.target.style.borderColor = 'var(--blue, #2980b9)'}
+                                  onBlurCapture={e => e.target.style.borderColor = 'transparent'}
+                                />
+                              </td>
                               <td className="text-right" style={{ fontSize: 11, color: 'var(--text2)' }}>{p.totalPrice.toFixed(2)} $</td>
                               <td className="text-right"><span className="fcfa-pill">{fcfa(p.totalPrice, rate, deduction)}</span></td>
                               <td><span className={`badge ${p.paid ? 'paid' : 'unpaid'}`}>{p.paid ? 'Payé' : 'En attente'}</span></td>

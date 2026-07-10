@@ -155,6 +155,12 @@ export function useStore() {
     setState(s => ({ ...s, payments: [...s.payments, appRow] }));
   };
 
+  const updatePayment = async (id, data) => {
+    const { error } = await supabase.from('payments').update(toDB(data)).eq('id', id);
+    if (error) { err('updatePayment', error); return; }
+    setState(s => ({ ...s, payments: s.payments.map(p => p.id === id ? { ...p, ...data } : p) }));
+  };
+
   const markPaid = async (id) => {
     const { error } = await supabase.from('payments').update({ paid: true }).eq('id', id);
     if (error) { err('markPaid', error); return; }
@@ -205,7 +211,7 @@ export function useStore() {
     ...state,
     addTranslator, updateTranslator, deleteTranslator,
     addAccount, updateAccount, deleteAccount,
-    addPayment, markPaid, deletePayment,
+    addPayment, updatePayment, markPaid, deletePayment,
     addCompany, updateCompany, deleteCompany,
     setRate, setDeduction,
   };
