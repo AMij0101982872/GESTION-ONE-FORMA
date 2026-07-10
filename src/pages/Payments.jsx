@@ -524,6 +524,23 @@ export default function Payments({ payments, accounts, translators, companies, o
         const pPaid  = Object.values(periodData).reduce((s, d) => s + d.paid, 0);
         const isOpen = openPeriods[period] !== false && (period === cp || openPeriods[period]);
 
+        // Totaux par société pour ce mois
+        const companyTotals = {};
+        Object.values(periodData).forEach(d => {
+          d.rows.forEach(p => {
+            const acc = accounts.find(a => a.id === p.accountId);
+            const co  = acc?.company || 'Autre';
+            if (!companyTotals[co]) companyTotals[co] = 0;
+            companyTotals[co] += p.totalPrice;
+          });
+        });
+        const CO_STYLE = {
+          'SOCIETE 1': { background: '#eef2ff', color: '#4338ca', border: '1px solid #a5b4fc' },
+          'SOCIETE 2': { background: '#f0fdf4', color: '#15803d', border: '1px solid #86efac' },
+          'SOCIETE 3': { background: '#fff7ed', color: '#c2410c', border: '1px solid #fdba74' },
+        };
+        const coStyle = (name) => CO_STYLE[name] || { background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' };
+
         return (
           <div key={period} className="card">
             {/* En-tête de la période */}
@@ -531,10 +548,15 @@ export default function Payments({ payments, accounts, translators, companies, o
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: isOpen ? '1rem' : 0 }}
               onClick={() => togglePeriod(period)}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <strong style={{ fontSize: 14 }}>{periodLabel(period)}</strong>
                 {period === cp && <span className="badge assigned" style={{ fontSize: 10 }}>Mois en cours</span>}
+                {Object.entries(companyTotals).map(([co, total]) => (
+                  <span key={co} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, ...coStyle(co) }}>
+                    {co} · {total.toFixed(2)} $
+                  </span>
+                ))}
               </div>
               <div style={{ display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' }}>
                 <span className="text-green fw-bold">{pPaid.toFixed(2)} $ payé</span>
