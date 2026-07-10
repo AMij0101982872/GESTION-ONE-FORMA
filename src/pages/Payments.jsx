@@ -178,7 +178,7 @@ function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
     .filter(r => r.accountVal && r.taskName);
 }
 
-export default function Payments({ payments, accounts, translators, companies, onAdd, onUpdate, onMarkPaid, onDelete, rate, deduction, onSetRate, onSetDeduction }) {
+export default function Payments({ payments, accounts, translators, companies, onAdd, onUpdate, onMarkPaid, onDelete, onDeletePeriod, rate, deduction, onSetRate, onSetDeduction }) {
   const [form, setForm]           = useState(emptyForm);
   const [preview, setPreview]     = useState(null);
   const [importPeriod, setImportPeriod] = useState(currentPeriod());
@@ -187,9 +187,10 @@ export default function Payments({ payments, accounts, translators, companies, o
   const [rateInput, setRateInput]           = useState(String(rate));
   const [deductionInput, setDeductionInput] = useState(String(deduction));
   const [openPeriods, setOpenPeriods] = useState({});
-  const [rawCount, setRawCount]   = useState(0);
-  const [receipt, setReceipt]     = useState(null);
-  const [confirmId, setConfirmId] = useState(null);
+  const [rawCount, setRawCount]         = useState(0);
+  const [receipt, setReceipt]           = useState(null);
+  const [confirmId, setConfirmId]       = useState(null);
+  const [confirmPeriod, setConfirmPeriod] = useState(null);
   const fileRef = useRef();
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -535,7 +536,7 @@ export default function Payments({ payments, accounts, translators, companies, o
                 <strong style={{ fontSize: 14 }}>{periodLabel(period)}</strong>
                 {period === cp && <span className="badge assigned" style={{ fontSize: 10 }}>Mois en cours</span>}
               </div>
-              <div style={{ display: 'flex', gap: 16, fontSize: 12, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' }}>
                 <span className="text-green fw-bold">{pPaid.toFixed(2)} $ payé</span>
                 {pDue > 0 && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -544,6 +545,13 @@ export default function Payments({ payments, accounts, translators, companies, o
                   </span>
                 )}
                 <span style={{ color: '#aaa', fontSize: 11 }}>{Object.values(periodData).reduce((s, d) => s + d.rows.length, 0)} ligne(s)</span>
+                <button
+                  className="btn sm danger icon"
+                  title="Supprimer tous les paiements de ce mois"
+                  onClick={e => { e.stopPropagation(); setConfirmPeriod(period); }}
+                >
+                  <Trash2 size={11} />
+                </button>
               </div>
             </div>
 
@@ -672,6 +680,14 @@ export default function Payments({ payments, accounts, translators, companies, o
           message="Supprimer cette ligne de paiement ?"
           onConfirm={async () => { await onDelete(confirmId); setConfirmId(null); }}
           onCancel={() => setConfirmId(null)}
+        />
+      )}
+
+      {confirmPeriod && (
+        <ConfirmModal
+          message={`Supprimer TOUS les paiements de ${periodLabel(confirmPeriod)} ?`}
+          onConfirm={async () => { await onDeletePeriod(confirmPeriod); setConfirmPeriod(null); }}
+          onCancel={() => setConfirmPeriod(null)}
         />
       )}
     </div>

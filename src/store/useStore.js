@@ -174,6 +174,17 @@ export function useStore() {
     toast('Paiement supprimé ✓');
   };
 
+  const deletePaymentsPeriod = async (period) => {
+    const ids = state.payments
+      .filter(p => (p.period || p.date?.slice(0, 7)) === period)
+      .map(p => p.id);
+    if (!ids.length) return;
+    const { error } = await supabase.from('payments').delete().in('id', ids);
+    if (error) { err('deletePaymentsPeriod', error); return; }
+    setState(s => ({ ...s, payments: s.payments.filter(p => !ids.includes(p.id)) }));
+    toast(`${ids.length} paiement(s) supprimé(s) ✓`);
+  };
+
   /* ── companies ── */
   const addCompany = async (c) => {
     const row = { id: 'co_' + Date.now(), ...c };
@@ -211,7 +222,7 @@ export function useStore() {
     ...state,
     addTranslator, updateTranslator, deleteTranslator,
     addAccount, updateAccount, deleteAccount,
-    addPayment, updatePayment, markPaid, deletePayment,
+    addPayment, updatePayment, markPaid, deletePayment, deletePaymentsPeriod,
     addCompany, updateCompany, deleteCompany,
     setRate, setDeduction,
   };
