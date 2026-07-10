@@ -273,21 +273,25 @@ export default function Payments({ payments, accounts, translators, companies, o
     toast('Ligne ajoutée ✓');
   };
 
-  // Grouper par période → société → traducteur
-  const byPeriod = {};
+  // Grouper par (période + société) → traducteur
+  const byBlock = {}; // clé = "period||company"
   payments.forEach(p => {
     const period  = p.period || p.date?.slice(0, 7) || 'inconnu';
     const acc     = accounts.find(a => a.id === p.accountId);
     const company = acc?.company || 'Autre';
+    const key     = `${period}||${company}`;
     const trKey   = p.translatorId || '__none__';
-    if (!byPeriod[period])                 byPeriod[period] = {};
-    if (!byPeriod[period][company])        byPeriod[period][company] = {};
-    if (!byPeriod[period][company][trKey]) byPeriod[period][company][trKey] = { paid: 0, due: 0, rows: [] };
-    if (p.paid) byPeriod[period][company][trKey].paid += p.totalPrice;
-    else        byPeriod[period][company][trKey].due  += p.totalPrice;
-    byPeriod[period][company][trKey].rows.push(p);
+    if (!byBlock[key])        byBlock[key] = { period, company, byTr: {} };
+    if (!byBlock[key].byTr[trKey]) byBlock[key].byTr[trKey] = { paid: 0, due: 0, rows: [] };
+    if (p.paid) byBlock[key].byTr[trKey].paid += p.totalPrice;
+    else        byBlock[key].byTr[trKey].due  += p.totalPrice;
+    byBlock[key].byTr[trKey].rows.push(p);
   });
-  const sortedPeriods = Object.keys(byPeriod).sort((a, b) => b.localeCompare(a));
+  // Trier : période desc, puis société asc
+  const sortedBlocks = Object.keys(byBlock).sort((a, b) => {
+    const [pa, ca] = a.split('||'); const [pb, cb] = b.split('||');
+    return pb.localeCompare(pa) || ca.localeCompare(cb);
+  });
 
   const CO_STYLE = {
     'SOCIETE 1': { background: '#eef2ff', color: '#4338ca', border: '1px solid #a5b4fc' },
@@ -522,187 +526,147 @@ export default function Payments({ payments, accounts, translators, companies, o
         </div>
       </details>
 
-      {/* Liste par période */}
-      {sortedPeriods.length === 0 && (
+      {/* Liste par période + société */}
+      {sortedBlocks.length === 0 && (
         <div className="card"><div className="empty">Aucun paiement enregistré</div></div>
       )}
 
-      {sortedPeriods.map(period => {
-        const periodData = byPeriod[period];
-        const allTrDataFlat = Object.values(periodData).flatMap(co => Object.values(co));
-        const pTotal = allTrDataFlat.reduce((s, d) => s + d.paid + d.due, 0);
-        const pDue   = allTrDataFlat.reduce((s, d) => s + d.due,  0);
-        const pPaid  = allTrDataFlat.reduce((s, d) => s + d.paid, 0);
-        const isOpen = openPeriods[period] !== false && (period === cp || openPeriods[period]);
-
-        const lineCount = allTrDataFlat.reduce((s, d) => s + d.rows.length, 0);
+      {sortedBlocks.map(key => {
+        const { period, company, byTr } = byBlock[key];
+        const trData    = Object.values(byTr);
+        const bDue      = trData.reduce((s, d) => s + d.due,  0);
+        const bPaid     = trData.reduce((s, d) => s + d.paid, 0);
+        const lineCount = trData.reduce((s, d) => s + d.rows.length, 0);
+        const isOpen    = openPeriods[key] !== false && (period === cp || openPeriods[key]);
+        const cs        = coStyle(company);
 
         return (
-          <div key={period} className="card">
-            {/* En-tête de la période */}
+          <div key={key} className="card" style={{ borderLeft: `4px solid ${cs.color}` }}>
             <div
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: isOpen ? '1rem' : 0 }}
-              onClick={() => togglePeriod(period)}
+              onClick={() => setOpenPeriods(s => ({ ...s, [key]: !isOpen }))}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <strong style={{ fontSize: 14 }}>{periodLabel(period)}</strong>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '2px 10px', borderRadius: 10, ...cs }}>{company}</span>
                 {period === cp && <span className="badge assigned" style={{ fontSize: 10 }}>Mois en cours</span>}
-                {Object.entries(periodData).map(([co, coData]) => {
-                  const coTotal = Object.values(coData).reduce((s, d) => s + d.paid + d.due, 0);
-                  return (
-                    <span key={co} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, ...coStyle(co) }}>
-                      {co} · {coTotal.toFixed(2)} $
-                    </span>
-                  );
-                })}
               </div>
               <div style={{ display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' }}>
-                <span className="text-green fw-bold">{pPaid.toFixed(2)} $ payé</span>
-                {pDue > 0 && (
+                {bPaid > 0 && <span className="text-green fw-bold">{bPaid.toFixed(2)} $ payé</span>}
+                {bDue > 0 && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                    <span className="fcfa-pill">{fcfa(pDue, rate, deduction)}</span>
-                    <span style={{ color: 'var(--text2)', fontSize: 11 }}>{pDue.toFixed(2)} $ dû</span>
+                    <span className="fcfa-pill">{fcfa(bDue, rate, deduction)}</span>
+                    <span style={{ color: 'var(--text2)', fontSize: 11 }}>{bDue.toFixed(2)} $ dû</span>
                   </span>
                 )}
                 <span style={{ color: '#aaa', fontSize: 11 }}>{lineCount} ligne(s)</span>
                 <button
                   className="btn sm danger icon"
-                  title="Supprimer tous les paiements de ce mois"
-                  onClick={e => { e.stopPropagation(); setConfirmPeriod(period); }}
+                  title={`Supprimer ${periodLabel(period)} — ${company}`}
+                  onClick={e => { e.stopPropagation(); setConfirmPeriod(key); }}
                 >
                   <Trash2 size={11} />
                 </button>
               </div>
             </div>
 
-            {/* Sociétés → Traducteurs */}
-            {isOpen && Object.entries(periodData).map(([company, coData]) => {
-              const coDue  = Object.values(coData).reduce((s, d) => s + d.due,  0);
-              const coPaid = Object.values(coData).reduce((s, d) => s + d.paid, 0);
+            {isOpen && translators.filter(t => byTr[t.id]).map(t => {
+              const d = byTr[t.id];
               return (
-                <div key={company} style={{ marginBottom: '1.5rem' }}>
-                  {/* En-tête société */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderRadius: 8, marginBottom: 10, ...coStyle(company) }}>
-                    <strong style={{ fontSize: 13 }}>{company}</strong>
-                    <div style={{ display: 'flex', gap: 12, fontSize: 12, alignItems: 'center' }}>
-                      {coPaid > 0 && <span style={{ fontWeight: 700 }}>{coPaid.toFixed(2)} $ payé</span>}
-                      {coDue  > 0 && <span style={{ fontWeight: 700 }}>{fcfa(coDue, rate, deduction)} · {coDue.toFixed(2)} $ dû</span>}
+                <div key={t.id} style={{ marginBottom: '1rem' }}>
+                  <div className="card-header" style={{ background: 'var(--surface2)', padding: '8px 12px', borderRadius: 8, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <strong style={{ fontSize: 13 }}>{t.name}</strong>
+                      <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.rows.length} tâche(s)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {d.paid > 0 && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span className="fcfa-pill" style={{ color: 'var(--green)', background: 'var(--green-bg)', borderColor: 'var(--green-border)' }}>{fcfa(d.paid, rate, deduction)}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.paid.toFixed(2)} $ payé</span>
+                        </span>
+                      )}
+                      {d.due > 0 && (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span className="fcfa-pill">{fcfa(d.due, rate, deduction)}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.due.toFixed(2)} $ dû</span>
+                        </span>
+                      )}
+                      {d.due > 0 && (
+                        <button
+                          className="btn sm green"
+                          onClick={() => { const ids = d.rows.filter(p => !p.paid).map(p => p.id); onMarkAllPaid(ids); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
+                        >
+                          <Check size={11} /> Tout payer
+                        </button>
+                      )}
+                      <button
+                        className="btn sm"
+                        onClick={() => setReceipt({ translator: t, rows: d.rows, period })}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
+                      >
+                        <Receipt size={11} /> Reçu image
+                      </button>
                     </div>
                   </div>
-
-                  {/* Traducteurs de cette société */}
-                  {translators.filter(t => coData[t.id]).map(t => {
-                    const d = coData[t.id];
-                    return (
-                      <div key={t.id} style={{ marginBottom: '1rem' }}>
-                        <div className="card-header" style={{ background: 'var(--surface2)', padding: '8px 12px', borderRadius: 8, marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <strong style={{ fontSize: 13 }}>{t.name}</strong>
-                            <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.rows.length} tâche(s)</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              {d.paid > 0 && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                  <span className="fcfa-pill" style={{ color: 'var(--green)', background: 'var(--green-bg)', borderColor: 'var(--green-border)' }}>{fcfa(d.paid, rate, deduction)}</span>
-                                  <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.paid.toFixed(2)} $ payé</span>
-                                </span>
-                              )}
-                              {d.due > 0 && (
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                  <span className="fcfa-pill">{fcfa(d.due, rate, deduction)}</span>
-                                  <span style={{ fontSize: 11, color: 'var(--text2)' }}>{d.due.toFixed(2)} $ dû</span>
-                                </span>
-                              )}
-                            </div>
-                            {d.due > 0 && (
-                              <button
-                                className="btn sm green"
-                                title="Marquer tous les paiements de ce traducteur comme payés"
-                                onClick={() => { const ids = d.rows.filter(p => !p.paid).map(p => p.id); onMarkAllPaid(ids); }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
-                              >
-                                <Check size={11} /> Tout payer
-                              </button>
-                            )}
-                            <button
-                              className="btn sm"
-                              title="Générer le reçu image à envoyer au traducteur"
-                              onClick={() => setReceipt({ translator: t, rows: d.rows, period })}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
-                            >
-                              <Receipt size={11} /> Reçu image
-                            </button>
-                          </div>
-                        </div>
-                        <div className="tbl-wrap">
-                          <table className="tbl">
-                            <thead>
-                              <tr>
-                                <th>Username</th>
-                                <th>Tâche</th>
-                                <th>Hits</th>
-                                <th>Mots</th>
-                                <th>Temps</th>
-                                <th>QA</th>
-                                <th>$/1k</th>
-                                <th>Total $</th>
-                                <th>FCFA</th>
-                                <th>Statut</th>
-                                <th></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {d.rows.map(p => {
-                                const acc = accounts.find(a => a.id === p.accountId);
-                                return (
-                                  <tr key={p.id}>
-                                    <td><span className="mono">{acc?.username || acc?.accid || '—'}</span></td>
-                                    <td style={{ fontSize: 11 }}>{p.taskName}</td>
-                                    <td className="text-right">{p.totalHits}</td>
-                                    <td className="text-right">{(p.paidWords || 0).toLocaleString()}</td>
-                                    <td className="text-right">{p.timeSpent}h</td>
-                                    <td className="text-right">{((p.qaScore || 1) * 100).toFixed(0)}%</td>
-                                    <td className="text-right">
-                                      <input
-                                        type="number" step="0.01" min="0"
-                                        defaultValue={(p.pricePer1k || 10).toFixed(2)}
-                                        onBlur={e => {
-                                          const val = parseFloat(e.target.value) || 10;
-                                          const newTotal = parseFloat(((p.paidWords || 0) / 1000 * val).toFixed(5));
-                                          onUpdate(p.id, { pricePer1k: val, totalPrice: newTotal });
-                                        }}
-                                        onKeyDown={e => e.key === 'Enter' && e.target.blur()}
-                                        style={{ width: 60, textAlign: 'right', border: '1px solid transparent', borderRadius: 4, padding: '2px 4px', fontSize: 'inherit', fontFamily: 'inherit', background: 'transparent', cursor: 'text' }}
-                                        onFocus={e => e.target.style.borderColor = 'var(--blue, #2980b9)'}
-                                        onBlurCapture={e => e.target.style.borderColor = 'transparent'}
-                                      />
-                                    </td>
-                                    <td className="text-right" style={{ fontSize: 11, color: 'var(--text2)' }}>{p.totalPrice.toFixed(2)} $</td>
-                                    <td className="text-right"><span className="fcfa-pill">{fcfa(p.totalPrice, rate, deduction)}</span></td>
-                                    <td><span className={`badge ${p.paid ? 'paid' : 'unpaid'}`}>{p.paid ? 'Payé' : 'En attente'}</span></td>
-                                    <td>
-                                      <div className="btn-group">
-                                        {!p.paid && (
-                                          <button className="btn sm green" onClick={() => { onMarkPaid(p.id); toast('Marqué payé ✓'); }}>
-                                            <Check size={11} /> Payé
-                                          </button>
-                                        )}
-                                        <button className="btn sm danger icon" onClick={() => setConfirmId(p.id)}>
-                                          <Trash2 size={11} />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="tbl-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Username</th><th>Tâche</th><th>Hits</th><th>Mots</th>
+                          <th>Temps</th><th>QA</th><th>$/1k</th><th>Total $</th>
+                          <th>FCFA</th><th>Statut</th><th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {d.rows.map(p => {
+                          const acc = accounts.find(a => a.id === p.accountId);
+                          return (
+                            <tr key={p.id}>
+                              <td><span className="mono">{acc?.username || acc?.accid || '—'}</span></td>
+                              <td style={{ fontSize: 11 }}>{p.taskName}</td>
+                              <td className="text-right">{p.totalHits}</td>
+                              <td className="text-right">{(p.paidWords || 0).toLocaleString()}</td>
+                              <td className="text-right">{p.timeSpent}h</td>
+                              <td className="text-right">{((p.qaScore || 1) * 100).toFixed(0)}%</td>
+                              <td className="text-right">
+                                <input
+                                  type="number" step="0.01" min="0"
+                                  defaultValue={(p.pricePer1k || 10).toFixed(2)}
+                                  onBlur={e => {
+                                    const val = parseFloat(e.target.value) || 10;
+                                    const newTotal = parseFloat(((p.paidWords || 0) / 1000 * val).toFixed(5));
+                                    onUpdate(p.id, { pricePer1k: val, totalPrice: newTotal });
+                                  }}
+                                  onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+                                  style={{ width: 60, textAlign: 'right', border: '1px solid transparent', borderRadius: 4, padding: '2px 4px', fontSize: 'inherit', fontFamily: 'inherit', background: 'transparent', cursor: 'text' }}
+                                  onFocus={e => e.target.style.borderColor = 'var(--blue, #2980b9)'}
+                                  onBlurCapture={e => e.target.style.borderColor = 'transparent'}
+                                />
+                              </td>
+                              <td className="text-right" style={{ fontSize: 11, color: 'var(--text2)' }}>{p.totalPrice.toFixed(2)} $</td>
+                              <td className="text-right"><span className="fcfa-pill">{fcfa(p.totalPrice, rate, deduction)}</span></td>
+                              <td><span className={`badge ${p.paid ? 'paid' : 'unpaid'}`}>{p.paid ? 'Payé' : 'En attente'}</span></td>
+                              <td>
+                                <div className="btn-group">
+                                  {!p.paid && (
+                                    <button className="btn sm green" onClick={() => { onMarkPaid(p.id); toast('Marqué payé ✓'); }}>
+                                      <Check size={11} /> Payé
+                                    </button>
+                                  )}
+                                  <button className="btn sm danger icon" onClick={() => setConfirmId(p.id)}>
+                                    <Trash2 size={11} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               );
             })}
@@ -730,13 +694,16 @@ export default function Payments({ payments, accounts, translators, companies, o
         />
       )}
 
-      {confirmPeriod && (
-        <ConfirmModal
-          message={`Supprimer TOUS les paiements de ${periodLabel(confirmPeriod)} ?`}
-          onConfirm={async () => { await onDeletePeriod(confirmPeriod); setConfirmPeriod(null); }}
-          onCancel={() => setConfirmPeriod(null)}
-        />
-      )}
+      {confirmPeriod && (() => {
+        const [p, co] = confirmPeriod.split('||');
+        return (
+          <ConfirmModal
+            message={`Supprimer tous les paiements de ${periodLabel(p)} — ${co} ?`}
+            onConfirm={async () => { await onDeletePeriod(p, co); setConfirmPeriod(null); }}
+            onCancel={() => setConfirmPeriod(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
