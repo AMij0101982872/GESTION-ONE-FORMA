@@ -16,6 +16,11 @@ const emptyForm = {
   period: currentPeriod(),
 };
 
+function extractLangPair(taskName) {
+  const m = String(taskName || '').match(/([A-Z][a-z]+)To([A-Z][a-z]+)/);
+  return m ? `${m[1]} → ${m[2]}` : null;
+}
+
 function matchAccount(accounts, val) {
   const v = val.toLowerCase();
   return accounts.find(a =>
@@ -178,7 +183,7 @@ function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
     .filter(r => r.accountVal && r.taskName);
 }
 
-export default function Payments({ payments, accounts, translators, companies, onAdd, onUpdate, onMarkPaid, onMarkAllPaid, onDelete, onDeletePeriod, rate, deduction, onSetRate, onSetDeduction }) {
+export default function Payments({ payments, accounts, translators, companies, onAdd, onUpdate, onUpdateAccount, onMarkPaid, onMarkAllPaid, onDelete, onDeletePeriod, rate, deduction, onSetRate, onSetDeduction }) {
   const [form, setForm]           = useState(emptyForm);
   const [preview, setPreview]     = useState(null);
   const [importPeriod, setImportPeriod] = useState(currentPeriod());
@@ -238,6 +243,19 @@ export default function Payments({ payments, accounts, translators, companies, o
   const confirmImport = () => {
     const matched = preview.filter(r => r.acc);
     if (!matched.length) { toast('Aucune ligne reconnue'); return; }
+
+    // Mettre à jour la paire de langue sur chaque compte (si pas encore définie)
+    const seen = new Set();
+    matched.forEach(r => {
+      if (!seen.has(r.acc.id)) {
+        seen.add(r.acc.id);
+        const langPair = extractLangPair(r.taskName);
+        if (langPair && !r.acc.languagePair) {
+          onUpdateAccount(r.acc.id, { languagePair: langPair });
+        }
+      }
+    });
+
     matched.forEach(r => {
       onAdd({
         accountId: r.acc.id, translatorId: r.acc.translatorId,
@@ -251,7 +269,6 @@ export default function Payments({ payments, accounts, translators, companies, o
     });
     toast(`${matched.length} ligne(s) importée(s) — ${periodLabel(importPeriod)} ✓`);
     setPreview(null);
-    // Ouvrir la période importée
     setOpenPeriods(s => ({ ...s, [importPeriod]: true }));
   };
 

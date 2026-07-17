@@ -60,7 +60,7 @@ function MainApp({ session }) {
     companies:   <Companies companies={store.companies} accounts={store.accounts} translators={store.translators} onAdd={store.addCompany} onUpdate={store.updateCompany} onDelete={store.deleteCompany} />,
     translators: <Translators translators={store.translators} accounts={store.accounts} payments={store.payments} onAdd={store.addTranslator} onUpdate={store.updateTranslator} onDelete={store.deleteTranslator} />,
     accounts:    <Accounts accounts={store.accounts} translators={store.translators} companies={store.companies} onAdd={store.addAccount} onUpdate={store.updateAccount} onDelete={store.deleteAccount} />,
-    payments:    <Payments payments={store.payments} accounts={store.accounts} translators={store.translators} companies={store.companies} onAdd={store.addPayment} onUpdate={store.updatePayment} onMarkPaid={store.markPaid} onMarkAllPaid={store.markAllPaid} onDelete={store.deletePayment} onDeletePeriod={store.deletePaymentsPeriod} rate={store.rate} deduction={store.deduction} onSetRate={store.setRate} onSetDeduction={store.setDeduction} />,
+    payments:    <Payments payments={store.payments} accounts={store.accounts} translators={store.translators} companies={store.companies} onAdd={store.addPayment} onUpdate={store.updatePayment} onUpdateAccount={store.updateAccount} onMarkPaid={store.markPaid} onMarkAllPaid={store.markAllPaid} onDelete={store.deletePayment} onDeletePeriod={store.deletePaymentsPeriod} rate={store.rate} deduction={store.deduction} onSetRate={store.setRate} onSetDeduction={store.setDeduction} />,
   };
 
   const pendingAccounts = store.accounts.filter(a => a.status === 'pending').length;
