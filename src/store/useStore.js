@@ -15,24 +15,25 @@ const defaultState = {
 /* ── field mappers DB ↔ App ── */
 const toApp = (row) => {
   if (!row) return row;
-  const { translator_id, account_id, created_at, task_name, total_hits, paid_words, time_spent, qa_score, price_per_1k, total_price, ...rest } = row;
+  const { translator_id, account_id, created_at, task_name, total_hits, paid_words, time_spent, qa_score, price_per_1k, total_price, language_pair, ...rest } = row;
   return {
     ...rest,
-    ...(translator_id !== undefined && { translatorId: translator_id }),
-    ...(account_id    !== undefined && { accountId:    account_id    }),
-    ...(created_at    !== undefined && { createdAt:    created_at    }),
-    ...(task_name     !== undefined && { taskName:     task_name     }),
-    ...(total_hits    !== undefined && { totalHits:    total_hits    }),
-    ...(paid_words    !== undefined && { paidWords:    paid_words    }),
-    ...(time_spent    !== undefined && { timeSpent:    time_spent    }),
-    ...(qa_score      !== undefined && { qaScore:      qa_score      }),
-    ...(price_per_1k  !== undefined && { pricePer1k:   price_per_1k  }),
-    ...(total_price   !== undefined && { totalPrice:   total_price   }),
+    ...(translator_id !== undefined && { translatorId:  translator_id }),
+    ...(account_id    !== undefined && { accountId:     account_id    }),
+    ...(created_at    !== undefined && { createdAt:     created_at    }),
+    ...(task_name     !== undefined && { taskName:      task_name     }),
+    ...(total_hits    !== undefined && { totalHits:     total_hits    }),
+    ...(paid_words    !== undefined && { paidWords:     paid_words    }),
+    ...(time_spent    !== undefined && { timeSpent:     time_spent    }),
+    ...(qa_score      !== undefined && { qaScore:       qa_score      }),
+    ...(price_per_1k  !== undefined && { pricePer1k:    price_per_1k  }),
+    ...(total_price   !== undefined && { totalPrice:    total_price   }),
+    ...(language_pair !== undefined && { languagePair:  language_pair }),
   };
 };
 
 const toDB = (obj) => {
-  const { translatorId, accountId, createdAt, taskName, totalHits, paidWords, timeSpent, qaScore, pricePer1k, totalPrice, date, ...rest } = obj;
+  const { translatorId, accountId, createdAt, taskName, totalHits, paidWords, timeSpent, qaScore, pricePer1k, totalPrice, languagePair, date, ...rest } = obj;
   return {
     ...rest,
     ...(translatorId !== undefined && { translator_id: translatorId ?? null }),
@@ -45,6 +46,7 @@ const toDB = (obj) => {
     ...(qaScore      !== undefined && { qa_score:      qaScore              }),
     ...(pricePer1k   !== undefined && { price_per_1k:  pricePer1k           }),
     ...(totalPrice   !== undefined && { total_price:   totalPrice           }),
+    ...(languagePair !== undefined && { language_pair: languagePair         }),
     // date ignoré — on utilise period
   };
 };
