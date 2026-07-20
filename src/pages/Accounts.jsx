@@ -54,8 +54,8 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
   };
 
   const saveLang = (acc) => {
-    const val = (langs[acc.id] ?? acc.lang ?? '').trim();
-    onUpdate(acc.id, { lang: val });
+    const val = (langs[acc.id] ?? acc.languagePair ?? '').trim();
+    onUpdate(acc.id, { languagePair: val });
     setLangs(l => { const n = { ...l }; delete n[acc.id]; return n; });
     toast('Langue enregistrée ✓');
   };
@@ -113,14 +113,14 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
   // Noms de sociétés présents dans les comptes (pour les filtres)
   const companyNames = [...new Set(accounts.map(a => a.company).filter(Boolean))].sort();
   // Paires de langues connues (pour autocomplétion)
-  const knownLangs = [...new Set(accounts.map(a => a.lang).filter(Boolean))].sort();
+  const knownLangs = [...new Set(accounts.map(a => a.languagePair).filter(Boolean))].sort();
 
   const filtered = [...accounts].reverse().filter(a => {
     const matchFilter     = filter === 'all' || a.status === filter;
     const matchCompany    = company === 'all' || (a.company || '') === company;
     const matchTranslator = translator === 'all' || a.translatorId === translator;
     const q = search.toLowerCase();
-    const matchSearch     = !q || a.email?.toLowerCase().includes(q) || a.accid?.toLowerCase().includes(q) || a.username?.toLowerCase().includes(q) || a.lang?.toLowerCase().includes(q) || a.company?.toLowerCase().includes(q);
+    const matchSearch     = !q || a.email?.toLowerCase().includes(q) || a.accid?.toLowerCase().includes(q) || a.username?.toLowerCase().includes(q) || a.languagePair?.toLowerCase().includes(q) || a.company?.toLowerCase().includes(q);
     return matchFilter && matchCompany && matchTranslator && matchSearch;
   });
 
@@ -374,8 +374,8 @@ export default function Accounts({ accounts, translators, companies = [], onAdd,
                       {/* Langue */}
                       <td style={{ minWidth: 200 }}>
                         <LangSelect
-                          value={acc.lang ?? ''}
-                          onChange={val => { onUpdate(acc.id, { lang: val }); toast('Langue enregistrée ✓'); }}
+                          value={acc.languagePair ?? ''}
+                          onChange={val => { onUpdate(acc.id, { languagePair: val }); toast('Langue enregistrée ✓'); }}
                         />
                       </td>
 
