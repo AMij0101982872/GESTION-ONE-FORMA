@@ -86,6 +86,44 @@ function rowsFromMatrix(matrix, accounts, fixedAccount = null) {
     return results;
   }
 
+  // ── Format SOCIETE 3 : Username | Contractor ID | Taskgroup | Submitted Hits | % to pay | WC after discount | Price/1k | Total Price ──
+  const s3Idx = matrix.findIndex(row => {
+    const cells = row.map(c => String(c || '').trim().toLowerCase());
+    return cells.some(c => /taskgroup/i.test(c)) && cells.some(c => /wc.+discount|wc after/i.test(c));
+  });
+
+  if (s3Idx !== -1) {
+    const header        = matrix[s3Idx].map(c => String(c || '').trim().toLowerCase());
+    const userCol       = header.findIndex(h => /^username$/i.test(h));
+    const taskCol       = header.findIndex(h => /taskgroup/i.test(h));
+    const hitsCol       = header.findIndex(h => /submitted.hit|^hits$/i.test(h));
+    const paidWCol      = header.findIndex(h => /wc.+discount|wc after/i.test(h));
+    const price1kCol    = header.findIndex(h => /price.*1000|per.*1000/i.test(h));
+    const totalPriceCol = header.findIndex(h => /^total price$/i.test(h));
+
+    console.log('Format S3 — headerIdx:', s3Idx, 'cols:', { userCol, taskCol, hitsCol, paidWCol, price1kCol, totalPriceCol });
+
+    const results = [];
+    matrix.slice(s3Idx + 1).forEach((row, i) => {
+      const username = userCol >= 0 ? String(row[userCol] || '').trim() : '';
+      const taskName = taskCol >= 0 ? String(row[taskCol] || '').trim() : '';
+
+      if (!username || /^total/i.test(username)) return;
+
+      const paidWords  = paidWCol      >= 0 ? num(row[paidWCol])      : 0;
+      const pricePer1k = price1kCol    >= 0 ? num(row[price1kCol])    : 10;
+      const totalPrice = totalPriceCol >= 0 ? num(row[totalPriceCol]) : parseFloat((paidWords / 1000 * pricePer1k).toFixed(5));
+      const totalHits  = hitsCol       >= 0 ? (parseInt(row[hitsCol]) || 0) : 0;
+
+      if (!paidWords && !totalPrice) return;
+
+      const acc = matchAccount(accounts, username);
+      console.log(`  S3 ligne ${s3Idx + 1 + i}: user="${username}" task="${taskName}" paidW=${paidWords} total=${totalPrice}`);
+      results.push({ accountVal: username, taskName, totalHits, timeSpent: 0, qaScore: 1, paidWords, pricePer1k, totalPrice, acc });
+    });
+    return results;
+  }
+
   // ── Format SOCIETE 2 (OneForma) : Email | Webapp | Username | Contractor ID | % to pay | WC after discount | Price/1k | Total Price ──
   const s2Idx = matrix.findIndex(row => {
     const cells = row.map(c => String(c || '').trim().toLowerCase());
