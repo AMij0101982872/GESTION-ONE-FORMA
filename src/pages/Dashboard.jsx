@@ -38,7 +38,7 @@ function KpiCard({ label, value, sub, color, icon: Icon, trend }) {
   );
 }
 
-function CustomTooltip({ active, payload, label, rate }) {
+function CustomTooltip({ active, payload, label, rate, deduction = 0 }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px', boxShadow: 'var(--shadow-md)', fontSize: 12 }}>
@@ -185,7 +185,7 @@ export default function Dashboard({ accounts, translators, payments, rate, deduc
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text2)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} axisLine={false} tickLine={false} width={40} tickFormatter={v => `$${v}`} />
-                <Tooltip content={<CustomTooltip rate={rate} />} cursor={{ fill: 'var(--surface2)' }} />
+                <Tooltip content={<CustomTooltip rate={rate} deduction={deduction} />} cursor={{ fill: 'var(--surface2)' }} />
                 <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 <Bar dataKey="Payé ($)" fill="#16a34a" radius={[4,4,0,0]} />
                 <Bar dataKey="Dû ($)"   fill="#f59e0b" radius={[4,4,0,0]} />
@@ -304,7 +304,7 @@ export default function Dashboard({ accounts, translators, payments, rate, deduc
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text2)' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--text2)' }} axisLine={false} tickLine={false} width={40} tickFormatter={v => `$${v}`} />
-                <Tooltip content={<CustomTooltip rate={rate} />} />
+                <Tooltip content={<CustomTooltip rate={rate} deduction={deduction} />} />
                 <Line dataKey="Dû ($)" stroke="#d97706" strokeWidth={2} dot={{ r: 4, fill: '#d97706', strokeWidth: 0 }} activeDot={{ r: 6 }} />
                 <Line dataKey="Payé ($)" stroke="#16a34a" strokeWidth={2} dot={{ r: 4, fill: '#16a34a', strokeWidth: 0 }} activeDot={{ r: 6 }} />
                 <Legend iconType="circle" iconSize={7} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
