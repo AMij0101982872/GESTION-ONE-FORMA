@@ -18,7 +18,7 @@ const emptyForm = {
 
 function extractLangPair(taskName) {
   const m = String(taskName || '').match(/([A-Z][a-z]+)To([A-Z][a-z]+)/);
-  return m ? `${m[1]} → ${m[2]}` : null;
+  return m ? m[0] : null;
 }
 
 function matchAccount(accounts, val) {
