@@ -34,7 +34,8 @@ export default function Translators({ translators, accounts, payments, onAdd, on
   const [form, setForm]       = useState(empty);
   const [editId, setEditId]   = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [search, setSearch]   = useState('');
+  const [search, setSearch]     = useState('');
+  const [langFilter, setLangFilter] = useState('');
   const [expanded, setExpanded] = useState({});
   const [confirmId, setConfirmId] = useState(null);
 
@@ -67,8 +68,17 @@ export default function Translators({ translators, accounts, payments, onAdd, on
   const totalDue      = payments.filter(p => !p.paid).reduce((s, p) => s + p.totalPrice, 0);
   const maxWords      = Math.max(...translators.map(t => payments.filter(p => p.translatorId === t.id).reduce((s, p) => s + (p.paidWords || 0), 0)), 1);
 
+  const allLangPairs = [...new Set(accounts.map(a => a.languagePair).filter(Boolean))].sort();
+
   const filtered = translators
-    .filter(t => !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.contact?.toLowerCase().includes(search.toLowerCase()))
+    .filter(t => {
+      if (search && !t.name.toLowerCase().includes(search.toLowerCase()) && !t.contact?.toLowerCase().includes(search.toLowerCase())) return false;
+      if (langFilter) {
+        const trAccs = accounts.filter(a => a.translatorId === t.id);
+        if (!trAccs.some(a => a.languagePair === langFilter)) return false;
+      }
+      return true;
+    })
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
   return (
@@ -135,16 +145,30 @@ export default function Translators({ translators, accounts, payments, onAdd, on
         </div>
       )}
 
-      {/* Recherche */}
+      {/* Recherche + filtre langue */}
       {translators.length > 0 && (
-        <div style={{ position: 'relative', marginBottom: '1rem', maxWidth: 320 }}>
-          <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher un traducteur…"
-            style={{ width: '100%', paddingLeft: 30, padding: '8px 10px 8px 30px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none', fontFamily: 'inherit' }}
-            onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-            onBlur={e => e.target.style.borderColor = 'var(--border)'}
-          />
+        <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 220px', maxWidth: 320 }}>
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text3)' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher un traducteur…"
+              style={{ width: '100%', paddingLeft: 30, padding: '8px 10px 8px 30px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, background: 'var(--surface)', color: 'var(--text)', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+              onBlur={e => e.target.style.borderColor = 'var(--border)'}
+            />
+          </div>
+          {allLangPairs.length > 0 && (
+            <select value={langFilter} onChange={e => setLangFilter(e.target.value)}
+              style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, background: 'var(--surface)', color: langFilter ? 'var(--text)' : 'var(--text3)', outline: 'none', fontFamily: 'inherit', cursor: 'pointer', minWidth: 180 }}>
+              <option value="">Toutes les paires</option>
+              {allLangPairs.map(lp => <option key={lp} value={lp}>{lp}</option>)}
+            </select>
+          )}
+          {langFilter && (
+            <button className="btn sm" onClick={() => setLangFilter('')} style={{ whiteSpace: 'nowrap' }}>
+              <X size={11} /> Effacer filtre
+            </button>
+          )}
         </div>
       )}
 
@@ -167,7 +191,7 @@ export default function Translators({ translators, accounts, payments, onAdd, on
         {filtered.map(t => {
           const accs          = accounts.filter(a => a.translatorId === t.id);
           const activeAccs    = accs.filter(a => a.status === 'active');
-          const assignedLangs = [...new Set(accs.map(a => a.lang).filter(Boolean))];
+          const assignedLangs = [...new Set(accs.map(a => a.languagePair).filter(Boolean))];
           const due           = payments.filter(p => p.translatorId === t.id && !p.paid).reduce((s, p) => s + p.totalPrice, 0);
           const words         = payments.filter(p => p.translatorId === t.id).reduce((s, p) => s + (p.paidWords || 0), 0);
           const wordsPct      = Math.round((words / maxWords) * 100);
@@ -266,7 +290,7 @@ export default function Translators({ translators, accounts, payments, onAdd, on
                                 : <span style={{ color: 'var(--text2)', fontStyle: 'italic' }}>{acc.email}</span>
                               }
                             </div>
-                            {acc.lang && <span className="lang-tag" style={{ marginTop: 2 }}>{acc.lang}</span>}
+                            {acc.languagePair && <span className="lang-tag" style={{ marginTop: 2 }}>{acc.languagePair}</span>}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, marginLeft: 8 }}>
                             <div style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_DOT[acc.status] }} />
